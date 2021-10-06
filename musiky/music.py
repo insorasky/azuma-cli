@@ -11,6 +11,7 @@
 from musiky.uuid import UUID16
 from musiky.file import AudioFile
 from musiky.exception import UnknownTagTypeException
+from musiky.lyric import Lyric
 
 
 class MusicInfo:
@@ -23,7 +24,7 @@ class MusicInfo:
         self.title: str = None  # 曲名
         self.artist: str = None  # 艺术家
         self.album: str = None  # 专辑
-        self.cover: (str, bytes) = None, None  # 专辑封面(MIME, 封面内容)
+        self.cover: tuple[str, bytes] = None, None  # 专辑封面(MIME, 封面内容)
         self.type: int = None  # 歌曲类型
         self.num: int = None  # 歌曲在专辑内的位置
         self.description: str = None  # 备注
@@ -107,6 +108,7 @@ class Music:
     def __init__(self, path: str = None):
         self.info: MusicInfo = None  # 曲目信息
         self.files: MusicFileList = None  # 音乐文件列表
+        self.lyrics: list[Lyric] = []  # 歌词列表
         self.published: bool = False  # 是否已发布
         if path is not None:
             file = AudioFile(path)

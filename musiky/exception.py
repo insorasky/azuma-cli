@@ -30,7 +30,7 @@ class UUID16InvalidException(MusikyException):
         self.u = u
 
     def __repr__(self):
-        return f'<UUID16InvaildException: Invaild UUID16 {self.u}>'
+        return f'<UUID16InvalidException: Invalid UUID16 {self.u}>'
 
 
 class UnknownTagTypeException(MusikyException):
@@ -39,3 +39,20 @@ class UnknownTagTypeException(MusikyException):
 
     def __repr__(self):
         return '<UnknownTagTypeException: Unknown or unsupported tag type>'
+
+
+class InvalidLRCLineException(MusikyException):
+    def __init__(self, line, file):
+        self.line = line
+        self.file = file
+
+    def __repr__(self):
+        return f'<InvalidLRCLine: Invalid line "{self.line}" in LRC file "{self.file}">'
+
+
+class InvalidStoreException(MusikyException):
+    def __init__(self, path):
+        self.path = path
+
+    def __repr__(self):
+        return f'<InvalidStoreException: Invalid store "{self.path}">'
