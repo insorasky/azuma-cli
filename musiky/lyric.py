@@ -65,5 +65,5 @@ class Lyric:
                     if data is None:  # Invalid line
                         raise InvalidLRCLineException(line, path)
                     else:
-                        tmp.lyrics.append(data.groups())
+                        tmp.lyrics.append(tuple(data.groups()))
         return tmp
