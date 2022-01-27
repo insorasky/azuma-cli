@@ -17,30 +17,30 @@ class AudioFile:
     """音频文件对象
     """
 
-    NORMAL = 0  # 普通音质
-    BETTER = 1  # 较高音质
-    HIGH = 2  # 高品音质
-    BEST = 3  # 超清音质
-    ORIGINAL = 4  # 无损音质
+    NORMAL = 0  # Normal quality
+    BETTER = 1  # Better quality
+    HIGH = 2  # High quality
+    BEST = 3  # Best quality
+    ORIGINAL = 4  # Original quality
 
-    MP3 = 100  # MP3格式
-    FLAC = 101  # FLAC格式
+    MP3 = 100  # MP3 format
+    FLAC = 101  # FLAC format
 
-    ID3 = 200  # ID3标签
-    VORBIS = 201  # Vorbis标签
+    ID3 = 200  # ID3 tag
+    VORBIS = 201  # Vorbis tag
 
-    UNKNOWN = -1  # 未知
+    UNKNOWN = -1  # Unknown
 
     def __init__(self, path):
-        self.path = os.path.abspath(path)  # 文件绝对路径
+        self.path = os.path.abspath(path)  # Absolute path of the file
         try:
-            self.muta_file = MutaFile(self.path)  # mutagen file对象
+            self.muta_file = MutaFile(self.path)  # Mutagen file object
         except Exception as e:
             raise FileImportException(self.path, e)
         self.mpeg_info = self.muta_file.info  # 音频采样信息
-        self.bitrate = self.mpeg_info.bitrate  # 音频比特率
-        self.sample_rate = self.mpeg_info.sample_rate  # 音频采样率
-        self.size = os.path.getsize(self.path)  # 文件大小
+        self.bitrate = self.mpeg_info.bitrate  # Bit rate
+        self.sample_rate = self.mpeg_info.sample_rate  # Sample rate
+        self.size = os.path.getsize(self.path)  # File sizq
 
     @property
     def file_type(self):
@@ -59,7 +59,7 @@ class AudioFile:
         """
         if hasattr(self.muta_file, 'ID3'):  # ID3格式
             return AudioFile.ID3, '.'.join([str(i) for i in self.muta_file.tags.version])
-        elif self.muta_file.__class__.__name__ == 'FLAC' or self.muta_file.__class__.__name__ == 'OggFileType':  # Vorbis格式，适用于flac和ogg
+        elif self.muta_file.__class__.__name__ == 'FLAC' or self.muta_file.__class__.__name__ == 'OggFileType':  # Vorbis format (flac and ogg)
             return AudioFile.VORBIS, '0'
         else:  # 未知格式
             return AudioFile.UNKNOWN, '0'
@@ -69,12 +69,12 @@ class AudioFile:
         """音频质量分级
         """
         if 0 < self.bitrate <= 128000:
-            return AudioFile.NORMAL  # 普通音质
+            return AudioFile.NORMAL
         elif self.bitrate <= 192000:
-            return AudioFile.BETTER  # 较高音质
+            return AudioFile.BETTER
         elif self.bitrate <= 320000:
-            return AudioFile.HIGH  # 高品音质
+            return AudioFile.HIGH
         elif self.file_type == 'mp3':
-            return AudioFile.BEST  # 超清音质
+            return AudioFile.BEST
         else:
-            return AudioFile.ORIGINAL  # 无损音质
+            return AudioFile.ORIGINAL

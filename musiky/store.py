@@ -13,9 +13,10 @@ import lzma
 import re
 import time
 
-from musiky.exception import InvalidStoreException
+from musiky.exception import InvalidStoreException, FileOrDirectoryExistsException
 from musiky.file import AudioFile
 from musiky.music import Music, MusicInfo, MusicFileList
+from musiky.lyric import Lyric
 
 
 class Store:
@@ -101,18 +102,32 @@ class Store:
                     elif quality <= AudioFile.ORIGINAL:
                         temp.files.original = AudioFile(os.path.join(music_path, 'files/original.flac'))
 
-        self.edits = []
+                elif key == 'lyriclang':
+                    temp.lyrics = [Lyric(os.path.join(music_path, f'files/{lang.strip()}.mklrc')) for lang in value.split(',') if lang]
+
+                self.musics.append(temp)
+
+        self.edits: list[Music] = []
 
     def add(self, music: Music):
-        self.musics.append(music)
+        self.edits.append(music)
 
     def commit(self):
         update_time = int(time.time() * 1000)
         self.set_header('last_update', update_time)
+        header_text = ''
+        for key, value in enumerate(self.headers):
+            value_lines = value.split('\n')
+            header_text += f'{key}: {value_lines[0]}\n'
+            for line in value_lines[1:]:
+                header_text += f' {line}\n'
 
     def set_header(self, key, value):
         self.headers[str(key)] = str(value)
 
     @staticmethod
-    def create():
-        pass
+    def create(path):
+        path = os.path.abspath(path)
+        if os.path.exists(path):
+            raise FileOrDirectoryExistsException(path)
+

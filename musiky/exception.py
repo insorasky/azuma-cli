@@ -56,3 +56,11 @@ class InvalidStoreException(MusikyException):
 
     def __repr__(self):
         return f'<InvalidStoreException: Invalid store "{self.path}">'
+
+
+class FileOrDirectoryExistsException(MusikyException):
+    def __init__(self, path):
+        self.path = path
+
+    def __repr__(self):
+        return f'<FileOrDirectoryExistsException: File or directory "{self.path}" exists>'

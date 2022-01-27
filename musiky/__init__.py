@@ -9,3 +9,5 @@
 # (at your option) any later version.
 
 __version__ = '0.0.1'
+
+__all__ = ['audio', 'exception', 'file', 'lyric', 'music', 'store', 'temp', 'uuid']
