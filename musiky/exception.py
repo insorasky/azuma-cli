@@ -64,3 +64,18 @@ class FileOrDirectoryExistsException(MusikyException):
 
     def __repr__(self):
         return f'<FileOrDirectoryExistsException: File or directory "{self.path}" exists>'
+
+
+class TargetQualityHigherThanCurrentException(MusikyException):
+    def __init__(self, path):
+        self.path = path
+
+    def __repr__(self):
+        return f'<TargetQualityHigherThanCurrentException: The target quality is higher then current file "{self.path}">'
+
+class InvalidQualityException(MusikyException):
+    def __init__(self, path):
+        self.path = path
+
+    def __repr__(self):
+        return f'<InvalidQualityException: The quality "{self.path}" is invalid>'

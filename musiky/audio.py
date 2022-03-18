@@ -8,4 +8,29 @@
 # the Free Software Foundation; either version 2 of the License, or
 # (at your option) any later version.
 
-import ffmpeg
+from pydub import AudioSegment
+from musiky.file import AudioFile
+from musiky.exception import TargetQualityHigherThanCurrentException, InvalidQualityException
+import os
+
+
+def convert(input_file: AudioFile, output_path: str, quality: int):
+    """
+    转换文件质量并清除歌曲信息，返回生成文件的AudioFile
+    """
+    curr = AudioSegment.from_file(input_file.path)
+    format = os.path.splitext(output_path)[-1][1:]
+    if quality == AudioFile.NORMAL:
+        bitrate = '128k'
+    elif quality == AudioFile.BETTER:
+        bitrate = '192k'
+    elif quality == AudioFile.HIGH:
+        bitrate = '320k'
+    elif quality == AudioFile.BEST:
+        bitrate = None
+    elif quality == AudioFile.ORIGINAL:
+        bitrate = None
+    else:
+        raise InvalidQualityException(quality)
+    curr.export(output_path, format=format, bitrate=bitrate)
+    return AudioFile(output_path)

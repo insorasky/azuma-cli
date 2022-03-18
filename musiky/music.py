@@ -114,6 +114,7 @@ class Music:
             file = AudioFile(path)
             self.files = MusicFileList()
             if import_file:
+                # 标记当前文件
                 if file.quality == AudioFile.NORMAL:
                     self.files.normal = file
                 elif file.quality == AudioFile.BETTER:
@@ -124,4 +125,6 @@ class Music:
                     self.files.best = file
                 elif file.quality == AudioFile.ORIGINAL:
                     self.files.original = file
+                # 生成低品质文件
+
             self.info = MusicInfo.load_from_file(file)

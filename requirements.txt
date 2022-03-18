@@ -1,4 +1,6 @@
-ffmpeg==1.4
+future==0.18.2
 greenlet==1.1.2
 mutagen==1.45.1
+pyee==9.0.4
 SQLAlchemy==1.4.32
+typing-extensions==4.1.1
