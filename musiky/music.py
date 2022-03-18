@@ -125,6 +125,4 @@ class Music:
                     self.files.best = file
                 elif file.quality == AudioFile.ORIGINAL:
                     self.files.original = file
-                # 生成低品质文件
-
             self.info = MusicInfo.load_from_file(file)

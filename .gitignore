@@ -120,6 +120,7 @@ dmypy.json
 music_example/
 public/
 test/
+temp/
 
 # macOS
 .DS_store
