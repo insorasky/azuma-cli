@@ -105,7 +105,7 @@ class MusicFileList:
 class Music:
     """单曲对象
     """
-    def __init__(self, path: str = None):
+    def __init__(self, path: str = None, import_file: bool = True):
         self.info: MusicInfo = None  # 曲目信息
         self.files: MusicFileList = None  # 音乐文件列表
         self.lyrics: list[Lyric] = []  # 歌词列表
@@ -113,14 +113,15 @@ class Music:
         if path is not None:
             file = AudioFile(path)
             self.files = MusicFileList()
-            if file.quality == AudioFile.NORMAL:
-                self.files.normal = file
-            elif file.quality == AudioFile.BETTER:
-                self.files.better = file
-            elif file.quality == AudioFile.HIGH:
-                self.files.high = file
-            elif file.quality == AudioFile.BEST:
-                self.files.best = file
-            elif file.quality == AudioFile.ORIGINAL:
-                self.files.original = file
+            if import_file:
+                if file.quality == AudioFile.NORMAL:
+                    self.files.normal = file
+                elif file.quality == AudioFile.BETTER:
+                    self.files.better = file
+                elif file.quality == AudioFile.HIGH:
+                    self.files.high = file
+                elif file.quality == AudioFile.BEST:
+                    self.files.best = file
+                elif file.quality == AudioFile.ORIGINAL:
+                    self.files.original = file
             self.info = MusicInfo.load_from_file(file)
