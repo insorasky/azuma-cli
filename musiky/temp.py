@@ -13,6 +13,7 @@ from sqlalchemy import Column, String, Integer, LargeBinary, JSON, create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.sql import exists
+from musiky.music import Music
 import os
 
 Base = declarative_base()
@@ -23,15 +24,15 @@ class MusicItem(Base):
     id = Column(Integer, primary_key=True)  # Database field ID
     song_id = Column(String(16))  # Song ID
     title = Column(String)  # Name of song
-    artist = Column(String)  # 艺术家
-    album = Column(String)  # 专辑
-    cover_mime = Column(String)  # 专辑封面MIME
-    cover_content = Column(LargeBinary)  # 专辑封面内容
-    type = Column(String)  # 歌曲类型
-    num = Column(Integer)  # 歌曲专辑内位置
-    file = Column(String)  # 歌曲文件路径
-    lyric = Column(String)  # 歌曲歌词路径
-    description = Column(String)  # 备注
+    artist = Column(String, nullable=True)  # 艺术家
+    album = Column(String, nullable=True)  # 专辑
+    cover_mime = Column(String, nullable=True)  # 专辑封面MIME
+    cover_content = Column(LargeBinary, nullable=True)  # 专辑封面内容
+    type = Column(String, nullable=True)  # 歌曲类型
+    num = Column(Integer, nullable=True)  # 歌曲专辑内位置
+    file = Column(JSON)  # 歌曲文件路径
+    lyric = Column(String, nullable=True)  # 歌曲歌词路径
+    description = Column(String, nullable=True)  # 备注
 
 
 class Config(Base):
@@ -43,19 +44,14 @@ class Config(Base):
 
 class TempDatabase:
     def __init__(self, path: str):
-        path = os.path.abspath(path)
-        self.path = path
-        db_path = os.path.join(path, 'temp.db')
-        file_path = os.path.join(path, 'files')
-        if os.path.exists(db_path):
-            self.engine = create_engine('sqlite:///' + db_path, echo=False)
+        self.path = os.path.abspath(path)
+        if os.path.exists(self.path):
+            self.engine = create_engine('sqlite:///' + self.path, echo=False)
         else:
-            self.engine = create_engine('sqlite:///' + db_path, echo=False)
+            self.engine = create_engine('sqlite:///' + self.path, echo=False)
             Base.metadata.create_all(self.engine)
         session = sessionmaker(bind=self.engine)
         self.db_sess = session()
-        if os.path.exists(file_path):
-            os.mkdir(path)
 
     def new_item(self, item: MusicItem, auto_commit: bool = True):
         self.db_sess.add(item)
@@ -81,3 +77,17 @@ class TempDatabase:
         else:
             self.db_sess.add(Config(name=key, value=[value]))
         self.db_sess.commit()
+
+
+class Temp:
+    def __init__(self, path: str):
+        self.path = os.path.abspath(path)
+        if not os.path.exists(path):
+            os.mkdir(path)
+        self.db = TempDatabase(os.path.join(path, 'temp.db'))
+        self.files_path = os.path.join(path, 'files/')
+        if not os.path.exists(self.files_path):
+            os.mkdir(self.files_path)
+
+    def add_song(self, song: Music):
+        pass
