@@ -105,3 +105,18 @@ class Lyric:
                     tmp.lyrics.append(tuple(data.groups()))
 
         return tmp
+
+    def to_dict(self):
+        return {
+            'artist': self.artist,
+            'creator': self.creator,
+            'offset': self.offset,
+            'orig': self.orig,
+            'lang': self.lang,
+            'version': self.version,
+            'path': self.path,
+            'lyrics': [{
+                'time': lyric[0],
+                'word': lyric[1]
+            } for lyric in self.lyrics]
+        }

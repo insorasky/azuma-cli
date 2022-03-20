@@ -14,7 +14,10 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.sql import exists
 from musiky.music import Music
+from musiky.uuid import UUID16
 import os
+import copy
+import shutil
 
 Base = declarative_base()
 
@@ -89,5 +92,61 @@ class Temp:
         if not os.path.exists(self.files_path):
             os.mkdir(self.files_path)
 
-    def add_song(self, song: Music):
+    def commit_item(self, music: Music):
+        temp_music = copy.deepcopy(music)
+
+        # Generate ID when no ID
+        if music.info.id is None:
+            temp_music.info.id = UUID16()
+
+        # Copy all music files to temp folder
+        for quality, path in music.files.to_dict().items():
+            if path:
+                new_path = os.path.join(self.files_path, music.info.id + '_' + quality + os.path.splitext(path)[-1])
+                if path != new_path:
+                    shutil.copyfile(path, new_path)
+                    temp_music.files.__dict__[quality].path = new_path
+
+        # Copy cover image to temp folder
+        cover_path = music.info.cover[1]
+        if cover_path:
+            new_path = os.path.join(self.files_path,
+                                    music.info.id + '_cover' + os.path.splitext(cover_path)[-1])
+            if cover_path != new_path:
+                shutil.copyfile(cover_path, new_path)
+                temp_music.info.cover[1] = new_path
+
+        # Copy lyric to temp folder
+        for i, lyric in enumerate(music.lyrics):
+            new_path = os.path.join(self.files_path, music.info.id + '_lyric_' + lyric.lang + '.lrc')
+            lyric.export(new_path)
+            temp_music.lyrics[i].path = new_path
+
+        # Add to database
+        self.db.new_item(MusicItem(
+            song_id=temp_music.info.song_id,
+            title=temp_music.info.title,
+            artist=temp_music.info.artist,
+            album=temp_music.info.album,
+            cover_mime=temp_music.info.cover[0],
+            cover_content=temp_music.info.cover[1],
+            type=temp_music.info.type,
+            num=temp_music.info.num,
+            file=temp_music.files,
+            lyric=[lyric.to_dict() for lyric in temp_music.lyrics],
+            description=temp_music.info.description
+        ))
+
+        return temp_music
+
+    def get_item(self, music_id):
+        pass
+
+    def delete_item(self, music_id):
+        pass
+
+    def items(self):
+        pass
+
+    def temp_info(self):
         pass

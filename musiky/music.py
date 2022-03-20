@@ -101,6 +101,17 @@ class MusicFileList:
         self.best: AudioFile = None  # 超清音质
         self.original: AudioFile = None  # 无损音质
 
+    def to_dict(self):
+        """转换为字典
+        """
+        return {
+            'normal': self.normal.path if self.normal else None,
+            'better': self.better.path if self.better else None,
+            'high': self.high.path if self.high else None,
+            'best': self.best.path if self.best else None,
+            'original': self.original.path if self.original else None
+        }
+
 
 class Music:
     """单曲对象
