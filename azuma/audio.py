@@ -2,7 +2,7 @@
 # Copyright (C) 2022  Sora
 # ALL RIGHTS RESERVED.
 #
-# The module is a part of Azuma CLI.
+# The module is a part of Azuma Store Manager Module.
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation; either version 2 of the License, or
@@ -10,7 +10,7 @@
 
 from pydub import AudioSegment
 from azuma.file import AudioFile
-from azuma.exception import TargetQualityHigherThanCurrentException, InvalidQualityException
+from azuma.exception import InvalidQualityException
 import os
 
 

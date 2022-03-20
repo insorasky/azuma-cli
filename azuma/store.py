@@ -2,7 +2,7 @@
 # Copyright (C) 2022  Sora
 # ALL RIGHTS RESERVED.
 #
-# The module is a part of Azuma CLI.
+# The module is a part of Azuma Store Manager Module.
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation; either version 2 of the License, or
@@ -17,9 +17,10 @@ from azuma.exception import InvalidStoreException, FileOrDirectoryExistsExceptio
 from azuma.file import AudioFile
 from azuma.music import Music, MusicInfo, MusicFileList
 from azuma.lyric import Lyric
+from azuma.temp import Temp
 
 
-class Store:
+class StoreDatabase:
     def __init__(self, path: str):
         self.path = os.path.abspath(path)
         self.headers = {}
@@ -131,3 +132,6 @@ class Store:
         if os.path.exists(path):
             raise FileOrDirectoryExistsException(path)
 
+
+def create_store(path: str, temp: Temp):
+    pass

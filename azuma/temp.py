@@ -2,14 +2,14 @@
 # Copyright (C) 2022  Sora
 # ALL RIGHTS RESERVED.
 #
-# The module is a part of Azuma CLI.
+# The module is a part of Azuma Store Manager Module.
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation; either version 2 of the License, or
 # (at your option) any later version.
 
 
-from sqlalchemy import Column, String, Integer, LargeBinary, JSON, create_engine
+from sqlalchemy import Column, String, Integer, LargeBinary, JSON, create_engine, DateTime
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.sql import exists
@@ -17,6 +17,8 @@ from sqlalchemy.sql import exists
 from azuma.lyric import Lyric
 from azuma.music import Music
 from azuma.uuid import UUID16
+
+import datetime
 import os
 import copy
 import shutil
@@ -38,6 +40,7 @@ class MusicItem(Base):
     file = Column(JSON)  # 歌曲文件路径
     lyric = Column(JSON, nullable=True)  # 歌曲歌词
     description = Column(String, nullable=True)  # 备注
+    time = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)  # 添加时间
 
 
 class Config(Base):
@@ -45,6 +48,7 @@ class Config(Base):
     id = Column(Integer, primary_key=True)
     name = Column(String(20), index=True)
     value = Column(JSON)
+    time = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)  # 添加时间
 
 
 class TempDatabase:
@@ -72,15 +76,15 @@ class TempDatabase:
 
     def __getitem__(self, item):
         if self.__db_sess.query(exists().where(Config.name == item)).scalar():
-            return self.__db_sess.query(Config).filter(Config.name == item).first().value[0]
+            return self.__db_sess.query(Config).filter(Config.name == item).first().value
         else:
             return None
 
     def __setitem__(self, key, value):
         if self.__db_sess.query(exists().where(Config.name == key)).scalar():
-            self.__db_sess.query(Config).filter(Config.name == key).first().value = [value]
+            self.__db_sess.query(Config).filter(Config.name == key).first().value = value
         else:
-            self.__db_sess.add(Config(name=key, value=[value]))
+            self.__db_sess.add(Config(name=key, value=value))
         self.__db_sess.commit()
 
     def __delitem__(self, key):
@@ -97,6 +101,24 @@ class Temp:
         self.__files_path = os.path.join(self.__path, 'files/')
         if not os.path.exists(self.__files_path):
             os.mkdir(self.__files_path)
+
+        # ID
+        if self.__db['id'] is None:
+            self.__id = UUID16()
+            self.__db['id'] = str(self.__id)
+        else:
+            self.__id = UUID16(self.__db['id'])
+
+        # Create Time
+        if self.__db['create_time'] is None:
+            self.__create_time = datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
+            self.__db['create_time'] = self.__create_time
+        else:
+            self.__create_time = self.__db['create_time']
+
+    @property
+    def id(self):
+        return self.__id
 
     def commit_music(self, music: Music):
         temp_music = copy.deepcopy(music)
@@ -171,3 +193,27 @@ class Temp:
 
     def unset(self, key):
         del self.__db[key]
+
+    @property
+    def name(self):
+        return self.__db['name']
+
+    @name.setter
+    def name(self, value):
+        self.__db['name'] = value
+
+    @property
+    def maintainer(self):
+        return self.__db['maintainer']
+
+    @maintainer.setter
+    def maintainer(self, value):
+        self.__db['maintainer'] = value
+
+    @property
+    def description(self):
+        return self.__db['description']
+
+    @description.setter
+    def description(self, value):
+        self.__db['description'] = value
