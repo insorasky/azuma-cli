@@ -1,5 +1,5 @@
 # Azuma Python Module https://azuma.sorasky.in/
-# Copyright (C) 2021  Sora
+# Copyright (C) 2022  Sora
 # ALL RIGHTS RESERVED.
 #
 # The module is a part of Azuma CLI.
