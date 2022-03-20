@@ -1,8 +1,8 @@
-# Musiky Python Module https://musiky.sorasky.in/
+# Azuma Python Module https://azuma.sorasky.in/
 # Copyright (C) 2021  Sora
 # ALL RIGHTS RESERVED.
 #
-# The module is a part of Musiky CLI.
+# The module is a part of Azuma CLI.
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation; either version 2 of the License, or
@@ -12,7 +12,7 @@ import re
 import os
 import json
 import lzma
-from musiky.exception import InvalidLRCLineException
+from azuma.exception import InvalidLRCLineException
 
 
 class Lyric:
@@ -74,7 +74,7 @@ class Lyric:
     @staticmethod
     def load_from_lrc(path: str, orig: bool, lang: str = None):
         """
-        Currently Musiky lyrics format is not compatible with Enhanced LRC format.
+        Currently Azuma lyrics format is not compatible with Enhanced LRC format.
         All extended features (eg. word time tag) will be ignored.
         """
         tmp = Lyric()
@@ -114,9 +114,20 @@ class Lyric:
             'orig': self.orig,
             'lang': self.lang,
             'version': self.version,
-            'path': self.path,
             'lyrics': [{
                 'time': lyric[0],
                 'word': lyric[1]
             } for lyric in self.lyrics]
         }
+
+    @staticmethod
+    def from_dict(data: dict):
+        tmp = Lyric()
+        tmp.artist = data['artist']
+        tmp.creator = data['creator']
+        tmp.offset = data['offset']
+        tmp.orig = data['orig']
+        tmp.lang = data['lang']
+        tmp.version = data['version']
+        tmp.lyrics = [(line['time'], line['word']) for line in data['lyrics']]
+        return tmp

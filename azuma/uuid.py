@@ -1,8 +1,8 @@
-# Musiky Python Module https://musiky.sorasky.in/
+# Azuma Python Module https://azuma.sorasky.in/
 # Copyright (C) 2021  Sora
 # ALL RIGHTS RESERVED.
 #
-# The module is a part of Musiky CLI.
+# The module is a part of Azuma CLI.
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation; either version 2 of the License, or
@@ -25,7 +25,7 @@ def is_uuid16(u: str):
 
 class UUID16:
     """
-        Musiky使用的16位UUID的生成规则为：
+        Azuma使用的16位UUID的生成规则为：
 
         1、使用通用的UUID生成器生成整数形式的UUID；
 

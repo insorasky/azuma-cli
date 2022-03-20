@@ -1,8 +1,8 @@
-# Musiky Python Module https://musiky.sorasky.in/
+# Azuma Python Module https://azuma.sorasky.in/
 # Copyright (C) 2021  Sora
 # ALL RIGHTS RESERVED.
 #
-# The module is a part of Musiky CLI.
+# The module is a part of Azuma CLI.
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation; either version 2 of the License, or
@@ -11,12 +11,12 @@
 import os
 
 
-class MusikyException(Exception):
+class AzumaException(Exception):
     def __repr__(self):
-        return '<MusikyException: Base exception of Musiky>'
+        return '<AzumaException: Base exception of Azuma>'
 
 
-class FileImportException(MusikyException):
+class FileImportException(AzumaException):
     def __init__(self, path, e):
         self.path = os.path.abspath(path)
         self.e = e
@@ -25,7 +25,7 @@ class FileImportException(MusikyException):
         return f'<FileImportException: Cannot import file {self.path}, {type(self.e)}>'
 
 
-class UUID16InvalidException(MusikyException):
+class UUID16InvalidException(AzumaException):
     def __init__(self, u):
         self.u = u
 
@@ -33,7 +33,7 @@ class UUID16InvalidException(MusikyException):
         return f'<UUID16InvalidException: Invalid UUID16 {self.u}>'
 
 
-class UnknownTagTypeException(MusikyException):
+class UnknownTagTypeException(AzumaException):
     def __init__(self, tag):
         self.tag = tag
 
@@ -41,7 +41,7 @@ class UnknownTagTypeException(MusikyException):
         return '<UnknownTagTypeException: Unknown or unsupported tag type>'
 
 
-class InvalidLRCLineException(MusikyException):
+class InvalidLRCLineException(AzumaException):
     def __init__(self, line, file):
         self.line = line
         self.file = file
@@ -50,7 +50,7 @@ class InvalidLRCLineException(MusikyException):
         return f'<InvalidLRCLine: Invalid line "{self.line}" in LRC file "{self.file}">'
 
 
-class InvalidStoreException(MusikyException):
+class InvalidStoreException(AzumaException):
     def __init__(self, path):
         self.path = path
 
@@ -58,7 +58,7 @@ class InvalidStoreException(MusikyException):
         return f'<InvalidStoreException: Invalid store "{self.path}">'
 
 
-class FileOrDirectoryExistsException(MusikyException):
+class FileOrDirectoryExistsException(AzumaException):
     def __init__(self, path):
         self.path = path
 
@@ -66,14 +66,14 @@ class FileOrDirectoryExistsException(MusikyException):
         return f'<FileOrDirectoryExistsException: File or directory "{self.path}" exists>'
 
 
-class TargetQualityHigherThanCurrentException(MusikyException):
+class TargetQualityHigherThanCurrentException(AzumaException):
     def __init__(self, path):
         self.path = path
 
     def __repr__(self):
         return f'<TargetQualityHigherThanCurrentException: The target quality is higher then current file "{self.path}">'
 
-class InvalidQualityException(MusikyException):
+class InvalidQualityException(AzumaException):
     def __init__(self, path):
         self.path = path
 

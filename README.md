@@ -1,1 +1,1 @@
-![Musiky项目导图](Musiky.svg)
+![Azuma项目导图](Azuma.svg)

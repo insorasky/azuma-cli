@@ -116,7 +116,7 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-# Musiky Test
+# Azuma Test
 music_example/
 public/
 test/
