@@ -20,7 +20,7 @@ from azuma.lyric import Lyric
 from azuma.temp import Temp
 
 
-class StoreDatabase:
+class Store:
     def __init__(self, path: str):
         self.path = os.path.abspath(path)
         self.headers = {}
@@ -39,6 +39,8 @@ class StoreDatabase:
                         continue
                     key, value = re.match(r'(.*):(.*)', line).groups()
                     self.headers[key.strip()] = value.strip()
+                    if key == 'id':
+                        self.__id = value
         except (lzma.LZMAError, FileNotFoundError):
             raise InvalidStoreException(path)
 
@@ -126,12 +128,17 @@ class StoreDatabase:
     def set_header(self, key, value):
         self.headers[str(key)] = str(value)
 
+    @property
+    def id(self):
+        return self.headers['id']
+
     @staticmethod
     def create(path):
         path = os.path.abspath(path)
         if os.path.exists(path):
             raise FileOrDirectoryExistsException(path)
+        # Create Empty Store
 
 
-def create_store(path: str, temp: Temp):
+def generate_store(path: str, temp: Temp):
     pass

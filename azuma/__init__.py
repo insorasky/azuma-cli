@@ -13,9 +13,9 @@ from .file import AudioFile
 from .lyric import Lyric
 from .temp import Temp
 from .music import Music
-from .store import create_store
+from .store import Store, generate_store
 from .uuid import UUID16
 
 __version__ = '0.0.1'
 
-__all__ = ['convert', 'AudioFile', 'Lyric', 'Temp', 'Music', 'create_store', 'UUID16', 'exception']
+__all__ = ['convert', 'AudioFile', 'Lyric', 'Temp', 'Music', 'Store', 'generate_store', 'UUID16', 'exception']
