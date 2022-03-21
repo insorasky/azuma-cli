@@ -18,6 +18,7 @@ from azuma.file import AudioFile
 from azuma.music import Music, MusicInfo, MusicFileList
 from azuma.lyric import Lyric
 from azuma.temp import Temp
+from azuma.uuid import UUID16
 
 
 class Store:
@@ -58,7 +59,7 @@ class Store:
             lines = text.split('\n')
             for line in lines:
                 if line == '':
-                    pass
+                    continue
                 key, value = re.match(r'(.*):(.*)', line).groups()
                 temp = Music()
                 temp.info = MusicInfo()
@@ -106,7 +107,7 @@ class Store:
                         temp.files.original = AudioFile(os.path.join(music_path, 'files/original.flac'))
 
                 elif key == 'lyriclang':
-                    temp.lyrics = [Lyric(os.path.join(music_path, f'files/{lang.strip()}.mklrc')) for lang in value.split(',') if lang]
+                    temp.lyrics = [Lyric(os.path.join(music_path, f'files/{lang.strip()}.azml')) for lang in value.split(',') if lang]
 
                 self.musics.append(temp)
 
@@ -120,30 +121,35 @@ class Store:
         self.set_header('last_update', update_time)
         header_text = ''
         for key, value in enumerate(self.headers):
-            value_lines = value.split('\n')
-            header_text += f'{key}: {value_lines[0]}\n'
-            for line in value_lines[1:]:
-                header_text += f' {line}\n'
+            header_text += f'{key}:{value}\n'
+        with lzma.open(os.path.join(self.path, 'meta/header.xz'), 'w') as f:
+            f.write(header_text.encode('utf-8'))
 
     def set_header(self, key, value):
         self.headers[str(key)] = str(value)
 
     @property
     def id(self):
-        return self.headers['id']
+        return UUID16(self.headers['id'])
 
     @staticmethod
-    def create(path):
+    def create(path, store_id: UUID16):
         path = os.path.abspath(path)
         if os.path.exists(path):
             raise FileOrDirectoryExistsException(path)
         # Create Empty Store
         os.mkdir(path)
-        os.mkdir(os.path.join(path, 'res'))
         os.mkdir(os.path.join(path, 'meta'))
-        with lzma.open(os.path.join(path, 'meta/all.xz')) as meta:
-            pass
-
+        os.mkdir(os.path.join(path, 'meta/list'))
+        os.mkdir(os.path.join(path, 'music'))
+        with lzma.open(os.path.join(path, 'meta/header.xz'), 'wb') as f:
+            f.write(f'id:{str(store_id)}\n'
+                    f'last_update:{int(time.time() * 1000)}\n'
+                    f'version:1.0\n'
+                    f'list:all\n'.encode('UTF-8'))
+        with lzma.open(os.path.join(path, 'meta/list/all.xz'), 'wb') as f:
+            f.write(''.encode('UTF-8'))
+        return Store(path)
 
 
 def generate_store(path: str, temp: Temp):

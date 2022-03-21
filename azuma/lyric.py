@@ -53,7 +53,7 @@ class Lyric:
     def export(self, path: str):
         """
         Export to lyrics LZMA extracted JSON file.
-        Extension name should be ".mklrc".
+        Extension name should be ".azml".
         """
         path = os.path.abspath(path)
         with lzma.open(path, 'w') as f:

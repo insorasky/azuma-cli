@@ -121,6 +121,7 @@ music_example/
 public/
 test/
 temp/
+store/
 
 # macOS
 .DS_store
