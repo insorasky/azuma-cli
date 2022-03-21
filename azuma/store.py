@@ -138,6 +138,12 @@ class Store:
         if os.path.exists(path):
             raise FileOrDirectoryExistsException(path)
         # Create Empty Store
+        os.mkdir(path)
+        os.mkdir(os.path.join(path, 'res'))
+        os.mkdir(os.path.join(path, 'meta'))
+        with lzma.open(os.path.join(path, 'meta/all.xz')) as meta:
+            pass
+
 
 
 def generate_store(path: str, temp: Temp):
