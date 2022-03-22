@@ -112,6 +112,34 @@ class MusicFileList:
             'original': self.original.path if self.original else None
         }
 
+    def highest_quality(self):
+        if self.original is not None:
+            return AudioFile.ORIGINAL
+        elif self.best is not None:
+            return AudioFile.BEST
+        elif self.high is not None:
+            return AudioFile.HIGH
+        elif self.better is not None:
+            return AudioFile.BETTER
+        elif self.normal is not None:
+            return AudioFile.NORMAL
+        else:
+            return None
+
+    def get_file_from_quality(self, quality: int):
+        if quality == AudioFile.ORIGINAL:
+            return self.original
+        elif quality == AudioFile.BEST:
+            return self.best
+        elif quality == AudioFile.HIGH:
+            return self.high
+        elif quality == AudioFile.BETTER:
+            return self.better
+        elif quality == AudioFile.NORMAL:
+            return self.normal
+        else:
+            return None
+
 
 class Music:
     """单曲对象

@@ -9,7 +9,7 @@
 # (at your option) any later version.
 
 from mutagen import File as MutaFile
-from .exception import FileImportException
+from .exception import FileImportException, InvalidQualityException
 import os
 
 
@@ -78,3 +78,18 @@ class AudioFile:
             return AudioFile.BEST
         else:
             return AudioFile.ORIGINAL
+
+    @staticmethod
+    def get_quality_str(quality: int):
+        if quality == AudioFile.NORMAL:
+            return 'normal'
+        elif quality == AudioFile.BETTER:
+            return 'better'
+        elif quality == AudioFile.HIGH:
+            return 'high'
+        elif quality == AudioFile.BEST:
+            return 'best'
+        elif quality == AudioFile.ORIGINAL:
+            return 'original'
+        else:
+            raise InvalidQualityException(quality)

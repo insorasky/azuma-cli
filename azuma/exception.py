@@ -73,9 +73,27 @@ class TargetQualityHigherThanCurrentException(AzumaException):
     def __repr__(self):
         return f'<TargetQualityHigherThanCurrentException: The target quality is higher then current file "{self.path}">'
 
+
 class InvalidQualityException(AzumaException):
-    def __init__(self, path):
-        self.path = path
+    def __init__(self, quality):
+        self.quality = quality
 
     def __repr__(self):
-        return f'<InvalidQualityException: The quality "{self.path}" is invalid>'
+        return f'<InvalidQualityException: The quality "{self.quality}" is invalid>'
+
+
+class HeaderProtectedException(AzumaException):
+    def __init__(self, key):
+        self.key = key
+
+    def __repr__(self):
+        return f'<HeaderProtectedException: The header "{self.key}" is protected and ' \
+               f'cannot be changed after initialization>'
+
+
+class HeaderNotFoundException(AzumaException):
+    def __init__(self, key):
+        self.key = key
+
+    def __repr__(self):
+        return f'<HeaderNotFoundException: The header "{self.key}" is not found>'

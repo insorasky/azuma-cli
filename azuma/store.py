@@ -11,21 +11,28 @@
 import os
 import lzma
 import re
+import shutil
 import time
+import logging
+import hashlib
 
-from azuma.exception import InvalidStoreException, FileOrDirectoryExistsException
+from azuma.exception import InvalidStoreException, FileOrDirectoryExistsException, HeaderProtectedException, \
+    HeaderNotFoundException
 from azuma.file import AudioFile
 from azuma.music import Music, MusicInfo, MusicFileList
 from azuma.lyric import Lyric
 from azuma.temp import Temp
 from azuma.uuid import UUID16
+from azuma.audio import convert
+
+HEADERS_PROTECTED = ['id', 'version']
 
 
 class Store:
     def __init__(self, path: str):
-        self.path = os.path.abspath(path)
-        self.headers = {}
-        self.musics = []
+        self.__path = os.path.abspath(path)
+        self.__headers = {}
+        self.__musics = []
         if not os.path.isdir(path):
             raise InvalidStoreException(path)
 
@@ -39,9 +46,7 @@ class Store:
                     if line == '':  # Empty line
                         continue
                     key, value = re.match(r'(.*):(.*)', line).groups()
-                    self.headers[key.strip()] = value.strip()
-                    if key == 'id':
-                        self.__id = value
+                    self.__headers[key.strip()] = value.strip()
         except (lzma.LZMAError, FileNotFoundError):
             raise InvalidStoreException(path)
 
@@ -107,30 +112,129 @@ class Store:
                         temp.files.original = AudioFile(os.path.join(music_path, 'files/original.flac'))
 
                 elif key == 'lyriclang':
-                    temp.lyrics = [Lyric(os.path.join(music_path, f'files/{lang.strip()}.azml')) for lang in value.split(',') if lang]
+                    temp.lyrics = [Lyric(os.path.join(music_path, f'lyrics/{lang.strip()}.azml')) for lang in
+                                   value.split(',') if lang]
 
-                self.musics.append(temp)
+                self.__musics.append(temp)
 
-        self.edits: list[Music] = []
+        self.__edits: list[Music] = []
 
     def add(self, music: Music):
-        self.edits.append(music)
+        self.__edits.append(music)
 
     def commit(self):
-        update_time = int(time.time() * 1000)
-        self.set_header('last_update', update_time)
-        header_text = ''
-        for key, value in enumerate(self.headers):
-            header_text += f'{key}:{value}\n'
-        with lzma.open(os.path.join(self.path, 'meta/header.xz'), 'w') as f:
+        # Music
+        update_time = None
+        if len(self.__edits):
+            new_music = []
+            for music in self.__edits:
+                logging.debug(f'Processing Music {music.info.title}: {music.info.id}')
+                music_path = os.path.join(self.__path, 'music/' + str(music.info.id))
+                os.mkdir(music_path)
+                os.mkdir(os.path.join(music_path, 'cover'))
+                os.mkdir(os.path.join(music_path, 'files'))
+                os.mkdir(os.path.join(music_path, 'lyrics'))
+                tmp = {'id': music.info.id, 'title': music.info.title}
+                if music.info.artist:
+                    tmp['artist'] = music.info.artist
+                if music.info.album:
+                    tmp['album'] = music.info.album
+                if music.info.type is not None:
+                    tmp['type'] = str(music.info.type)
+                if music.info.num is not None:
+                    tmp['num'] = str(music.info.num)
+                if music.info.description:
+                    tmp['description'] = music.info.description
+                if music.info.cover[1]:
+                    with open(os.path.join(music_path, 'cover/cover'), 'wb') as f:
+                        f.write(music.info.cover[1])
+                    tmp['cover'] = 'cover'
+                highest_quality = music.files.highest_quality()
+                for quality in range(AudioFile.NORMAL, highest_quality + 1):
+                    if music.files.get_file_from_quality(quality) is None:
+                        if quality < highest_quality:
+                            output_path = os.path.join(music_path, f'files/{AudioFile.get_quality_str(quality)}.mp3')
+                            convert(
+                                input_file=music.files.get_file_from_quality(highest_quality),
+                                output_path=output_path,
+                                quality=quality
+                            )
+                            file = open(output_path, 'rb')
+                            md5 = hashlib.md5(file.read()).hexdigest()
+                            file.close()
+                            with open(output_path + '.md5', 'w') as f:
+                                f.write(md5)
+                    else:
+                        output_path = f'files/{AudioFile.get_quality_str(quality)}{os.path.splitext(music.files.get_file_from_quality(quality).path)[1]}'
+                        shutil.copyfile(
+                            music.files.get_file_from_quality(quality).path,
+                            os.path.join(music_path, output_path)
+                        )
+                        file = open(output_path, 'rb')
+                        md5 = hashlib.md5(file.read()).hexdigest()
+                        file.close()
+                        with open(output_path + '.md5', 'w') as f:
+                            f.write(md5)
+                tmp['quality'] = AudioFile.get_quality_str(highest_quality)
+
+                # Lyrics
+                languages = []
+                for lyric in music.lyrics:
+                    lyric.export(os.path.join(music_path, f'lyrics/{lyric.lang}.azml'))
+                    languages.append(lyric.lang)
+                tmp['lyriclang'] = ','.join(languages)
+                new_music.append(tmp)
+
+            old_music_count = len(self.__musics)
+            self.__musics.extend(self.__edits)
+
+            # Write to meta
+            update_time = int(time.time() * 1000)
+            with lzma.open(os.path.join(self.__path, 'meta/list/all.xz'), 'a+') as f:
+                f.write(
+                    ('\n' if old_music_count else '')
+                    + '\n'.join([
+                        '\n'.join([f'{key}:{value}' for key, value in info.items()])
+                        for info in new_music
+                    ])
+                    + '\n'
+                )
+            with lzma.open(os.path.join(self.__path, f'meta/list/{update_time}.xz'), 'w') as f:
+                f.write(
+                    '\n'.join([
+                        '\n'.join([f'{key}:{value}' for key, value in info.items()])
+                        for info in new_music
+                    ])
+                    + '\n'
+                )
+
+        # Headers
+        if update_time is None:
+            update_time = int(time.time() * 1000)
+        self.__headers['last_update'] = str(update_time)
+        header_text = '\n'.join([f'{key}:{value}' for key, value in self.__headers.items()])
+        with lzma.open(os.path.join(self.__path, 'meta/header.xz'), 'w') as f:
             f.write(header_text.encode('utf-8'))
 
-    def set_header(self, key, value):
-        self.headers[str(key)] = str(value)
+    def set_header(self, key: str, value: str):
+        if key in HEADERS_PROTECTED:
+            raise HeaderProtectedException(key)
+        self.__headers[key] = value
+
+    def remove_header(self, key):
+        if key in HEADERS_PROTECTED:
+            raise HeaderProtectedException(key)
+        if key not in self.__headers:
+            raise HeaderNotFoundException(key)
+        del self.__headers[key]
 
     @property
     def id(self):
-        return UUID16(self.headers['id'])
+        return UUID16(self.__headers['id'])
+
+    @property
+    def path(self):
+        return self.__path
 
     @staticmethod
     def create(path, store_id: UUID16):
@@ -152,5 +256,5 @@ class Store:
         return Store(path)
 
 
-def generate_store(path: str, temp: Temp):
+def generate_store_from_temp(path: str, temp: Temp):
     pass
