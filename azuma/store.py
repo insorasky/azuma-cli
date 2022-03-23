@@ -16,7 +16,7 @@ import time
 import logging
 import hashlib
 import json
-from typing import Optional
+from typing import Union
 
 from azuma.exception import InvalidStoreException, FileOrDirectoryExistsException, HeaderProtectedException, \
     HeaderNotFoundException
@@ -34,7 +34,7 @@ class Edit:
     ADD = 0
     REMOVE = 1
 
-    def __init__(self, type_: int, data: Optional[Music, UUID16]):
+    def __init__(self, type_: int, data: Union[Music, UUID16]):
         self.type = type_
         self.data = data
 
@@ -71,63 +71,64 @@ class Store:
                 store_text = f.read().decode('utf-8')
         except (lzma.LZMAError, FileNotFoundError):
             raise InvalidStoreException(path)
-        song_texts = store_text.split('\n\n')
-        for text in song_texts:
-            temp = Music()
-            temp.info = MusicInfo()
-            temp.files = MusicFileList()
-            lines = text.split('\n')
-            for line in lines:
-                if line == '':
-                    continue
-                key, value = re.match(r'(.*?):(.*)', line).groups()
-                if key == 'id':
-                    temp.info.id = value
-                    music_path = os.path.join(path, 'music/' + str(temp.info.id))
-                elif key == 'title':
-                    temp.info.title = value
-                elif key == 'artist':
-                    temp.info.artist = json.loads(value)
-                elif key == 'album':
-                    temp.info.album = value
-                elif key == 'type':
-                    temp.info.type = int(value)
-                elif key == 'num':
-                    temp.info.num = int(value)
-                elif key == 'description':
-                    temp.info.description = value
-                elif key == 'cover':
-                    temp.info.cover = open(os.path.join(music_path, 'cover/' + value))
-                elif key == 'quality':
-                    if value == 'normal':
-                        quality = AudioFile.NORMAL
-                    elif value == 'better':
-                        quality = AudioFile.BETTER
-                    elif value == 'high':
-                        quality = AudioFile.HIGH
-                    elif value == 'best':
-                        quality = AudioFile.BEST
-                    elif value == 'original':
-                        quality = AudioFile.ORIGINAL
-                    else:
-                        raise InvalidStoreException(path)
+        if store_text:
+            song_texts = store_text.split('\n\n')
+            for text in song_texts:
+                temp = Music()
+                temp.info = MusicInfo()
+                temp.files = MusicFileList()
+                lines = text.split('\n')
+                for line in lines:
+                    if line == '':
+                        continue
+                    key, value = re.match(r'(.*?):(.*)', line).groups()
+                    if key == 'id':
+                        temp.info.id = value
+                        music_path = os.path.join(path, 'music/' + str(temp.info.id))
+                    elif key == 'title':
+                        temp.info.title = value
+                    elif key == 'artist':
+                        temp.info.artist = json.loads(value)
+                    elif key == 'album':
+                        temp.info.album = value
+                    elif key == 'type':
+                        temp.info.type = int(value)
+                    elif key == 'num':
+                        temp.info.num = int(value)
+                    elif key == 'description':
+                        temp.info.description = value
+                    elif key == 'cover':
+                        temp.info.cover = open(os.path.join(music_path, 'cover/' + value))
+                    elif key == 'quality':
+                        if value == 'normal':
+                            quality = AudioFile.NORMAL
+                        elif value == 'better':
+                            quality = AudioFile.BETTER
+                        elif value == 'high':
+                            quality = AudioFile.HIGH
+                        elif value == 'best':
+                            quality = AudioFile.BEST
+                        elif value == 'original':
+                            quality = AudioFile.ORIGINAL
+                        else:
+                            raise InvalidStoreException(path)
 
-                    if quality >= AudioFile.NORMAL:
-                        temp.files.normal = AudioFile(os.path.join(music_path, 'files/normal.mp3'))
-                    if quality >= AudioFile.BETTER:
-                        temp.files.better = AudioFile(os.path.join(music_path, 'files/better.mp3'))
-                    if quality >= AudioFile.HIGH:
-                        temp.files.high = AudioFile(os.path.join(music_path, 'files/high.mp3'))
-                    if quality >= AudioFile.BEST:
-                        temp.files.best = AudioFile(os.path.join(music_path, 'files/best.mp3'))
-                    if quality >= AudioFile.ORIGINAL:
-                        temp.files.original = AudioFile(os.path.join(music_path, 'files/original.flac'))
+                        if quality >= AudioFile.NORMAL:
+                            temp.files.normal = AudioFile(os.path.join(music_path, 'files/normal.mp3'))
+                        if quality >= AudioFile.BETTER:
+                            temp.files.better = AudioFile(os.path.join(music_path, 'files/better.mp3'))
+                        if quality >= AudioFile.HIGH:
+                            temp.files.high = AudioFile(os.path.join(music_path, 'files/high.mp3'))
+                        if quality >= AudioFile.BEST:
+                            temp.files.best = AudioFile(os.path.join(music_path, 'files/best.mp3'))
+                        if quality >= AudioFile.ORIGINAL:
+                            temp.files.original = AudioFile(os.path.join(music_path, 'files/original.flac'))
 
-                elif key == 'lyriclang':
-                    temp.lyrics = [Lyric(os.path.join(music_path, f'lyrics/{lang.strip()}.azml')) for lang in
-                                   value.split(',') if lang]
+                    elif key == 'lyriclang':
+                        temp.lyrics = [Lyric(os.path.join(music_path, f'lyrics/{lang.strip()}.azml')) for lang in
+                                       value.split(',') if lang]
 
-            self.__musics.append(temp)
+                self.__musics.append(temp)
 
     def add(self, music: Music):
         self.__edits.append(Edit(Edit.ADD, music))
@@ -205,22 +206,27 @@ class Store:
 
                     self.__musics.append(music)
                 elif edit.type == Edit.REMOVE:
+                    shutil.rmtree(os.path.join(self.__path, 'music/' + str(edit.data)))
                     new_items.append({'remove': str(edit.data)})
 
             # Write to meta
             update_time = int(time.time() * 1000)
             self.__headers['list'] += ',' + str(update_time)
 
-            with lzma.open(os.path.join(self.__path, 'meta/list/all.xz')) as f:
+            with lzma.open(os.path.join(self.__path, 'meta/list/all.xz'), 'r') as f:
                 data = f.read().decode('utf-8')
-                blocks = data.split('\n\n')
-                removed_identities = ['id:' + str(item.data) for item in self.__edits if item.type == Edit.REMOVE]
-                blocks = [block for block in blocks if block.split('\n')[0] not in removed_identities]
-                data = '\n\n'.join(blocks)
-                data += (('\n' if old_music_count else '') + '\n'.join([
-                            '\n'.join([f'{key}:{value}' for key, value in info.items()])
-                            for info in new_items if 'remove' not in info
-                        ]) + '\n')
+            with lzma.open(os.path.join(self.__path, 'meta/list/all.xz'), 'w') as f:
+                if data:
+                    blocks = data.split('\n\n')
+                    if blocks[-1] == '':
+                        blocks.pop()
+                    removed_identities = ['id:' + str(item.data) for item in self.__edits if item.type == Edit.REMOVE]
+                    blocks = [block for block in blocks if block.split('\n')[0] not in removed_identities]
+                    data = '\n\n'.join(blocks)
+                data += (''.join([
+                            (('\n' if (i or old_music_count) else '') + '\n'.join([f'{key}:{value}' for key, value in info.items()]) + '\n')
+                            for i, info in enumerate(new_items) if 'remove' not in info
+                        ]))
                 f.write(data.encode('utf-8'))
 
             with lzma.open(os.path.join(self.__path, f'meta/list/{update_time}.xz'), 'w') as f:

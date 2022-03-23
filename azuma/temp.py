@@ -76,7 +76,7 @@ class TempDatabase:
             self.__db_sess.commit()
 
     def get_item(self, *args):
-        return self.__db_sess.query(MusicItem).filter(args).all()
+        return self.__db_sess.query(MusicItem).filter(*args).all()
 
     def remove_item(self, song_id: UUID16):
         self.__db_sess.query(MusicItem).filter(MusicItem.song_id == str(song_id)).delete()

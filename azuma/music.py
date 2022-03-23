@@ -112,6 +112,15 @@ class MusicFileList:
             'original': self.original.path if self.original else None
         }
 
+    def from_dict(self, d: dict):
+        """从字典导入
+        """
+        self.normal = AudioFile(d['normal']) if d['normal'] else None
+        self.better = AudioFile(d['better']) if d['better'] else None
+        self.high = AudioFile(d['high']) if d['high'] else None
+        self.best = AudioFile(d['best']) if d['best'] else None
+        self.original = AudioFile(d['original']) if d['original'] else None
+
     def highest_quality(self):
         if self.original is not None:
             return AudioFile.ORIGINAL
@@ -145,13 +154,11 @@ class Music:
     """单曲对象
     """
     def __init__(self, path: str = None, import_file: bool = True):
-        self.info: MusicInfo = None  # 曲目信息
-        self.files: MusicFileList = None  # 音乐文件列表
+        self.info: MusicInfo = MusicInfo()  # 曲目信息
+        self.files: MusicFileList = MusicFileList()  # 音乐文件列表
         self.lyrics: list[Lyric] = []  # 歌词列表
-        self.published: bool = False  # 是否已发布
         if path is not None:
             file = AudioFile(path)
-            self.files = MusicFileList()
             if import_file:
                 # 标记当前文件
                 if file.quality == AudioFile.NORMAL:
