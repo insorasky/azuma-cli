@@ -52,3 +52,9 @@ class UUID16:
 
     def __str__(self):
         return self._u
+
+    def __eq__(self, other):
+        if isinstance(other, UUID16):
+            return self._u == other._u
+        else:
+            return False

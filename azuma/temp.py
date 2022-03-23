@@ -51,6 +51,14 @@ class Config(Base):
     time = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)  # 添加时间
 
 
+class EditLog(Base):
+    __tablename__ = 'editlog'
+    id = Column(Integer, primary_key=True)
+    type = Column(Integer)  # 0: add, 1: delete, 2: update
+    uuid = Column(String(16))  # UUID
+    time = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)  # 添加时间
+
+
 class TempDatabase:
     def __init__(self, path: str):
         self.__path = os.path.abspath(path)

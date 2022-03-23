@@ -15,6 +15,8 @@ import shutil
 import time
 import logging
 import hashlib
+import json
+from typing import Optional
 
 from azuma.exception import InvalidStoreException, FileOrDirectoryExistsException, HeaderProtectedException, \
     HeaderNotFoundException
@@ -28,11 +30,21 @@ from azuma.audio import convert
 HEADERS_PROTECTED = ['id', 'version']
 
 
+class Edit:
+    ADD = 0
+    REMOVE = 1
+
+    def __init__(self, type_: int, data: Optional[Music, UUID16]):
+        self.type = type_
+        self.data = data
+
+
 class Store:
     def __init__(self, path: str):
         self.__path = os.path.abspath(path)
         self.__headers = {}
         self.__musics = []
+        self.__edits: list[Edit] = []
         if not os.path.isdir(path):
             raise InvalidStoreException(path)
 
@@ -61,21 +73,21 @@ class Store:
             raise InvalidStoreException(path)
         song_texts = store_text.split('\n\n')
         for text in song_texts:
+            temp = Music()
+            temp.info = MusicInfo()
+            temp.files = MusicFileList()
             lines = text.split('\n')
             for line in lines:
                 if line == '':
                     continue
-                key, value = re.match(r'(.*):(.*)', line).groups()
-                temp = Music()
-                temp.info = MusicInfo()
-                temp.files = MusicFileList()
+                key, value = re.match(r'(.*?):(.*)', line).groups()
                 if key == 'id':
                     temp.info.id = value
                     music_path = os.path.join(path, 'music/' + str(temp.info.id))
                 elif key == 'title':
                     temp.info.title = value
                 elif key == 'artist':
-                    temp.info.artist = value
+                    temp.info.artist = json.loads(value)
                 elif key == 'album':
                     temp.info.album = value
                 elif key == 'type':
@@ -100,112 +112,124 @@ class Store:
                     else:
                         raise InvalidStoreException(path)
 
-                    if quality <= AudioFile.NORMAL:
+                    if quality >= AudioFile.NORMAL:
                         temp.files.normal = AudioFile(os.path.join(music_path, 'files/normal.mp3'))
-                    elif quality <= AudioFile.BETTER:
+                    if quality >= AudioFile.BETTER:
                         temp.files.better = AudioFile(os.path.join(music_path, 'files/better.mp3'))
-                    elif quality <= AudioFile.HIGH:
+                    if quality >= AudioFile.HIGH:
                         temp.files.high = AudioFile(os.path.join(music_path, 'files/high.mp3'))
-                    elif quality <= AudioFile.BEST:
+                    if quality >= AudioFile.BEST:
                         temp.files.best = AudioFile(os.path.join(music_path, 'files/best.mp3'))
-                    elif quality <= AudioFile.ORIGINAL:
+                    if quality >= AudioFile.ORIGINAL:
                         temp.files.original = AudioFile(os.path.join(music_path, 'files/original.flac'))
 
                 elif key == 'lyriclang':
                     temp.lyrics = [Lyric(os.path.join(music_path, f'lyrics/{lang.strip()}.azml')) for lang in
                                    value.split(',') if lang]
 
-                self.__musics.append(temp)
-
-        self.__edits: list[Music] = []
+            self.__musics.append(temp)
 
     def add(self, music: Music):
-        self.__edits.append(music)
+        self.__edits.append(Edit(Edit.ADD, music))
+
+    def remove(self, id: UUID16):
+        self.__edits.append(Edit(Edit.REMOVE, id))
 
     def commit(self):
         # Music
         update_time = None
         if len(self.__edits):
-            new_music = []
-            for music in self.__edits:
-                logging.debug(f'Processing Music {music.info.title}: {music.info.id}')
-                music_path = os.path.join(self.__path, 'music/' + str(music.info.id))
-                os.mkdir(music_path)
-                os.mkdir(os.path.join(music_path, 'cover'))
-                os.mkdir(os.path.join(music_path, 'files'))
-                os.mkdir(os.path.join(music_path, 'lyrics'))
-                tmp = {'id': music.info.id, 'title': music.info.title}
-                if music.info.artist:
-                    tmp['artist'] = music.info.artist
-                if music.info.album:
-                    tmp['album'] = music.info.album
-                if music.info.type is not None:
-                    tmp['type'] = str(music.info.type)
-                if music.info.num is not None:
-                    tmp['num'] = str(music.info.num)
-                if music.info.description:
-                    tmp['description'] = music.info.description
-                if music.info.cover[1]:
-                    with open(os.path.join(music_path, 'cover/cover'), 'wb') as f:
-                        f.write(music.info.cover[1])
-                    tmp['cover'] = 'cover'
-                highest_quality = music.files.highest_quality()
-                for quality in range(AudioFile.NORMAL, highest_quality + 1):
-                    if music.files.get_file_from_quality(quality) is None:
-                        if quality < highest_quality:
-                            output_path = os.path.join(music_path, f'files/{AudioFile.get_quality_str(quality)}.mp3')
-                            convert(
-                                input_file=music.files.get_file_from_quality(highest_quality),
-                                output_path=output_path,
-                                quality=quality
+            new_items = []
+            old_music_count = len(self.__musics)
+            for edit in self.__edits:
+                if edit.type == Edit.ADD:
+                    music = edit.data
+                    logging.debug(f'Processing Music {music.info.title}: {music.info.id}')
+                    music_path = os.path.join(self.__path, 'music/' + str(music.info.id))
+                    os.mkdir(music_path)
+                    os.mkdir(os.path.join(music_path, 'cover'))
+                    os.mkdir(os.path.join(music_path, 'files'))
+                    os.mkdir(os.path.join(music_path, 'lyrics'))
+                    tmp = {'id': music.info.id, 'title': music.info.title}
+                    if music.info.artist:
+                        tmp['artist'] = json.dumps(music.info.artist)
+                    if music.info.album:
+                        tmp['album'] = music.info.album
+                    if music.info.type is not None:
+                        tmp['type'] = str(music.info.type)
+                    if music.info.num is not None:
+                        tmp['num'] = str(music.info.num)
+                    if music.info.description:
+                        tmp['description'] = music.info.description
+                    if music.info.cover[1]:
+                        with open(os.path.join(music_path, 'cover/cover'), 'wb') as f:
+                            f.write(music.info.cover[1])
+                        tmp['cover'] = 'cover'
+                    highest_quality = music.files.highest_quality()
+                    for quality in range(AudioFile.NORMAL, highest_quality + 1):
+                        if music.files.get_file_from_quality(quality) is None:
+                            if quality < highest_quality:
+                                output_path = os.path.join(music_path,
+                                                           f'files/{AudioFile.get_quality_str(quality)}.mp3')
+                                convert(
+                                    input_file=music.files.get_file_from_quality(highest_quality),
+                                    output_path=output_path,
+                                    quality=quality
+                                )
+                                file = open(output_path, 'rb')
+                                md5 = hashlib.md5(file.read()).hexdigest()
+                                file.close()
+                                with open(output_path + '.md5', 'w') as f:
+                                    f.write(md5)
+                        else:
+                            output_path = os.path.join(music_path,
+                                                       f'files/{AudioFile.get_quality_str(quality)}{os.path.splitext(music.files.get_file_from_quality(quality).path)[1]}')
+                            shutil.copyfile(
+                                music.files.get_file_from_quality(quality).path,
+                                output_path
                             )
                             file = open(output_path, 'rb')
                             md5 = hashlib.md5(file.read()).hexdigest()
                             file.close()
                             with open(output_path + '.md5', 'w') as f:
                                 f.write(md5)
-                    else:
-                        output_path = f'files/{AudioFile.get_quality_str(quality)}{os.path.splitext(music.files.get_file_from_quality(quality).path)[1]}'
-                        shutil.copyfile(
-                            music.files.get_file_from_quality(quality).path,
-                            os.path.join(music_path, output_path)
-                        )
-                        file = open(output_path, 'rb')
-                        md5 = hashlib.md5(file.read()).hexdigest()
-                        file.close()
-                        with open(output_path + '.md5', 'w') as f:
-                            f.write(md5)
-                tmp['quality'] = AudioFile.get_quality_str(highest_quality)
+                    tmp['quality'] = AudioFile.get_quality_str(highest_quality)
 
-                # Lyrics
-                languages = []
-                for lyric in music.lyrics:
-                    lyric.export(os.path.join(music_path, f'lyrics/{lyric.lang}.azml'))
-                    languages.append(lyric.lang)
-                tmp['lyriclang'] = ','.join(languages)
-                new_music.append(tmp)
+                    # Lyrics
+                    languages = []
+                    for lyric in music.lyrics:
+                        lyric.export(os.path.join(music_path, f'lyrics/{lyric.lang}.azml'))
+                        languages.append(lyric.lang)
+                    tmp['lyriclang'] = ','.join(languages)
+                    new_items.append(tmp)
 
-            old_music_count = len(self.__musics)
-            self.__musics.extend(self.__edits)
+                    self.__musics.append(music)
+                elif edit.type == Edit.REMOVE:
+                    new_items.append({'remove': str(edit.data)})
 
             # Write to meta
             update_time = int(time.time() * 1000)
-            with lzma.open(os.path.join(self.__path, 'meta/list/all.xz'), 'a+') as f:
-                f.write(
-                    ('\n' if old_music_count else '')
-                    + '\n'.join([
-                        '\n'.join([f'{key}:{value}' for key, value in info.items()])
-                        for info in new_music
-                    ])
-                    + '\n'
-                )
+            self.__headers['list'] += ',' + str(update_time)
+
+            with lzma.open(os.path.join(self.__path, 'meta/list/all.xz')) as f:
+                data = f.read().decode('utf-8')
+                blocks = data.split('\n\n')
+                removed_identities = ['id:' + str(item.data) for item in self.__edits if item.type == Edit.REMOVE]
+                blocks = [block for block in blocks if block.split('\n')[0] not in removed_identities]
+                data = '\n\n'.join(blocks)
+                data += (('\n' if old_music_count else '') + '\n'.join([
+                            '\n'.join([f'{key}:{value}' for key, value in info.items()])
+                            for info in new_items if 'remove' not in info
+                        ]) + '\n')
+                f.write(data.encode('utf-8'))
+
             with lzma.open(os.path.join(self.__path, f'meta/list/{update_time}.xz'), 'w') as f:
                 f.write(
-                    '\n'.join([
+                    ('\n'.join([
                         '\n'.join([f'{key}:{value}' for key, value in info.items()])
-                        for info in new_music
+                        for info in new_items
                     ])
-                    + '\n'
+                     + '\n').encode('utf-8')
                 )
 
         # Headers
@@ -215,6 +239,8 @@ class Store:
         header_text = '\n'.join([f'{key}:{value}' for key, value in self.__headers.items()])
         with lzma.open(os.path.join(self.__path, 'meta/header.xz'), 'w') as f:
             f.write(header_text.encode('utf-8'))
+
+        self.__edits = []
 
     def set_header(self, key: str, value: str):
         if key in HEADERS_PROTECTED:

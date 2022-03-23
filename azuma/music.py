@@ -165,3 +165,4 @@ class Music:
                 elif file.quality == AudioFile.ORIGINAL:
                     self.files.original = file
             self.info = MusicInfo.load_from_file(file)
+            self.info.id = UUID16()
