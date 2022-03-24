@@ -16,16 +16,18 @@ import time
 import logging
 import hashlib
 import json
+from distutils.version import LooseVersion
 from typing import Union
 
 from azuma.exception import InvalidStoreException, FileOrDirectoryExistsException, HeaderProtectedException, \
-    HeaderNotFoundException
+    HeaderNotFoundException, StoreIdNotMatchException, StoreVersionIncompatibleException
 from azuma.file import AudioFile
 from azuma.music import Music, MusicInfo, MusicFileList
 from azuma.lyric import Lyric
 from azuma.temp import Temp
 from azuma.uuid import UUID16
 from azuma.audio import convert
+from azuma import __version__ as azuma_version
 
 HEADERS_PROTECTED = ['id', 'version']
 
@@ -260,6 +262,11 @@ class Store:
             raise HeaderNotFoundException(key)
         del self.__headers[key]
 
+    def get_header(self, key: str):
+        if key not in self.__headers:
+            raise HeaderNotFoundException(key)
+        return self.__headers[key]
+
     @property
     def id(self):
         return UUID16(self.__headers['id'])
@@ -289,4 +296,12 @@ class Store:
 
 
 def generate_store_from_temp(path: str, temp: Temp):
-    pass
+    if os.path.exists(path):
+        store = Store(path)
+        if store.id != temp.id:
+            raise StoreIdNotMatchException(store.id, temp.id)
+        version = store.get_header('version')
+        if LooseVersion(version) > LooseVersion(azuma_version):
+            raise StoreVersionIncompatibleException(version)
+    else:
+        store = Store.create(path, temp.id)

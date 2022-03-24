@@ -16,6 +16,6 @@ from .music import Music
 from .store import Store, generate_store_from_temp
 from .uuid import UUID16
 
-__version__ = '0.0.1'
+__version__ = '1.0'
 
 __all__ = ['convert', 'AudioFile', 'Lyric', 'Temp', 'Music', 'Store', 'generate_store_from_temp', 'UUID16', 'exception']

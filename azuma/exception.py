@@ -9,6 +9,7 @@
 # (at your option) any later version.
 
 import os
+from azuma import __version__ as azuma_version
 
 
 class AzumaException(Exception):
@@ -97,3 +98,21 @@ class HeaderNotFoundException(AzumaException):
 
     def __repr__(self):
         return f'<HeaderNotFoundException: The header "{self.key}" is not found>'
+
+
+class StoreIdNotMatchException(AzumaException):
+    def __init__(self, store_id, temp_id):
+        self.store_id = store_id
+        self.temp_id = temp_id
+
+    def __repr__(self):
+        return f'<StoreIdNotMatchException: The store id "{self.store_id}" does not match the temp id "{self.temp_id}">'
+
+
+class StoreVersionIncompatibleException(AzumaException):
+    def __init__(self, store_version):
+        self.store_version = store_version
+
+    def __repr__(self):
+        return f'<StoreVersionIncompatibleException: The store version "{self.store_version}" is newer than' \
+               f'the current azuma-cli version "{azuma_version}">'
