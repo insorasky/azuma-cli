@@ -277,6 +277,7 @@ class Store:
 
     @property
     def id(self):
+        # Get store ID
         return UUID16(self.__headers['id'])
 
     @property
