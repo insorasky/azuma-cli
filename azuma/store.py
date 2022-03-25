@@ -20,14 +20,14 @@ from distutils.version import LooseVersion
 from typing import Union
 
 from azuma.exception import InvalidStoreException, FileOrDirectoryExistsException, HeaderProtectedException, \
-    HeaderNotFoundException, StoreIdNotMatchException, StoreVersionIncompatibleException
+    HeaderNotFoundException, StoreIdNotMatchException, StoreVersionIncompatibleException, StoreLaterThanNowException
 from azuma.file import AudioFile
 from azuma.music import Music, MusicInfo, MusicFileList
 from azuma.lyric import Lyric
 from azuma.temp import Temp
 from azuma.uuid import UUID16
 from azuma.audio import convert
-from azuma import __version__ as azuma_version
+from azuma.utils import STORE_VERSION
 
 HEADERS_PROTECTED = ['id', 'version']
 
@@ -60,7 +60,10 @@ class Store:
                     if line == '':  # Empty line
                         continue
                     key, value = re.match(r'(.*):(.*)', line).groups()
-                    self.__headers[key.strip()] = value.strip()
+                    key, value = key.strip(), value.strip()
+                    if value == '':
+                        value = None
+                    self.__headers[key] = value
         except (lzma.LZMAError, FileNotFoundError):
             raise InvalidStoreException(path)
 
@@ -135,8 +138,12 @@ class Store:
     def add(self, music: Music):
         self.__edits.append(Edit(Edit.ADD, music))
 
-    def remove(self, id: UUID16):
-        self.__edits.append(Edit(Edit.REMOVE, id))
+    def remove(self, music_id: UUID16):
+        for item in self.__edits:
+            if item.type == 0 and item.data == music_id:
+                self.__edits.remove(item)
+        if music_id in self.__musics:
+            self.__edits.append(Edit(Edit.REMOVE, music_id))
 
     def commit(self):
         # Music
@@ -233,11 +240,10 @@ class Store:
 
             with lzma.open(os.path.join(self.__path, f'meta/list/{update_time}.xz'), 'w') as f:
                 f.write(
-                    ('\n'.join([
-                        '\n'.join([f'{key}:{value}' for key, value in info.items()])
-                        for info in new_items
-                    ])
-                     + '\n').encode('utf-8')
+                    (''.join([
+                        (('\n' if i else '') + '\n'.join([f'{key}:{value}' for key, value in info.items()]) + '\n')
+                        for i, info in enumerate(new_items)
+                    ])).encode('utf-8')
                 )
 
         # Headers
@@ -251,6 +257,8 @@ class Store:
         self.__edits = []
 
     def set_header(self, key: str, value: str):
+        if value is None:
+            value = ''
         if key in HEADERS_PROTECTED:
             raise HeaderProtectedException(key)
         self.__headers[key] = value
@@ -287,8 +295,8 @@ class Store:
         os.mkdir(os.path.join(path, 'music'))
         with lzma.open(os.path.join(path, 'meta/header.xz'), 'wb') as f:
             f.write(f'id:{str(store_id)}\n'
-                    f'last_update:{int(time.time() * 1000)}\n'
-                    f'version:1.0\n'
+                    f'last_update:0\n'
+                    f'version:{STORE_VERSION}\n'
                     f'list:all\n'.encode('UTF-8'))
         with lzma.open(os.path.join(path, 'meta/list/all.xz'), 'wb') as f:
             f.write(''.encode('UTF-8'))
@@ -301,7 +309,21 @@ def generate_store_from_temp(path: str, temp: Temp):
         if store.id != temp.id:
             raise StoreIdNotMatchException(store.id, temp.id)
         version = store.get_header('version')
-        if LooseVersion(version) > LooseVersion(azuma_version):
+        if LooseVersion(version) > LooseVersion(STORE_VERSION):
             raise StoreVersionIncompatibleException(version)
+        if int(store.get_header('last_update')) > int(time.time() * 1000):
+            raise StoreLaterThanNowException(store.get_header('last_update'))
     else:
         store = Store.create(path, temp.id)
+    store.set_header('name', temp.name)
+    store.set_header('maintainer', temp.maintainer)
+    store.set_header('description', temp.description)
+    edits_query = temp.get_edit_log(int(store.get_header('last_update')) / 1000)
+    for edit_type, uuid in edits_query:
+        if edit_type == 0:  # Add
+            music = temp.get_music(uuid)
+            store.add(music)
+        elif edit_type == 1:  # Delete
+            store.remove(uuid)
+    store.commit()
+    return store

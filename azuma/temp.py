@@ -54,7 +54,7 @@ class Config(Base):
 class EditLog(Base):
     __tablename__ = 'editlog'
     id = Column(Integer, primary_key=True)
-    type = Column(Integer)  # 0: add, 1: delete, 2: update
+    type = Column(Integer)  # 0: add, 1: delete
     uuid = Column(String(16))  # UUID
     time = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)  # 添加时间
 
@@ -72,6 +72,7 @@ class TempDatabase:
 
     def new_item(self, item: MusicItem, auto_commit: bool = True):
         self.__db_sess.add(item)
+        self.__db_sess.add(EditLog(type=0, uuid=str(item.song_id)))
         if auto_commit:
             self.__db_sess.commit()
 
@@ -80,7 +81,11 @@ class TempDatabase:
 
     def remove_item(self, song_id: UUID16):
         self.__db_sess.query(MusicItem).filter(MusicItem.song_id == str(song_id)).delete()
+        self.__db_sess.add(EditLog(type=1, uuid=str(song_id)))
         self.__db_sess.commit()
+
+    def get_edit_log(self, *args):
+        return self.__db_sess.query(EditLog).filter(*args).all()
 
     def __getitem__(self, item):
         if self.__db_sess.query(exists().where(Config.name == item)).scalar():
@@ -145,7 +150,9 @@ class Temp:
                     temp_music.files.__dict__[quality].__path = new_path
 
         # Delete if exists
-        self.__db.remove_item(temp_music.info.id)
+        query = self.__db.get_item(MusicItem.song_id == str(temp_music.info.id))
+        if query:
+            self.__db.remove_item(temp_music.info.id)
 
         # Add to database
         self.__db.new_item(MusicItem(
@@ -225,3 +232,7 @@ class Temp:
     @description.setter
     def description(self, value):
         self.__db['description'] = value
+
+    def get_edit_log(self, timestamp: float = 0) -> list[tuple[int, UUID16]]:
+        query = self.__db.get_edit_log(EditLog.time > datetime.datetime.fromtimestamp(timestamp))
+        return [(item.type, UUID16(item.uuid)) for item in query]

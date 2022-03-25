@@ -9,7 +9,7 @@
 # (at your option) any later version.
 
 import os
-from azuma import __version__ as azuma_version
+from azuma.utils import STORE_VERSION
 
 
 class AzumaException(Exception):
@@ -115,4 +115,13 @@ class StoreVersionIncompatibleException(AzumaException):
 
     def __repr__(self):
         return f'<StoreVersionIncompatibleException: The store version "{self.store_version}" is newer than' \
-               f'the current azuma-cli version "{azuma_version}">'
+               f'the current azuma-cli version "{STORE_VERSION}">'
+
+
+class StoreLaterThanNowException(AzumaException):
+    def __init__(self, last_update):
+        self.last_update = last_update
+
+    def __repr__(self):
+        return f'<StoreVersionIncompatibleException: The store last update time "{self.last_update}" is later than' \
+               f'the current system time>'
