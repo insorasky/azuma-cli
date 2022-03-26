@@ -14,6 +14,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.sql import exists
 
+from azuma.exception import InvalidTempException
 from azuma.lyric import Lyric
 from azuma.music import Music
 from azuma.uuid import UUID16
@@ -108,7 +109,10 @@ class TempDatabase:
 class Temp:
     def __init__(self, path: str):
         self.__path = os.path.abspath(path)
-        if not os.path.exists(self.__path):
+        if os.path.exists(self.__path):
+            if not os.path.exists(os.path.join(self.__path, 'temp.db')):
+                raise InvalidTempException(self.__path)
+        else:
             os.mkdir(self.__path)
         self.__db = TempDatabase(os.path.join(self.__path, 'temp.db'))
         self.__files_path = os.path.join(self.__path, 'files/')
@@ -193,6 +197,9 @@ class Temp:
         query = self.__db.get_item(MusicItem.song_id == str(song_id))
         if query:
             self.__db.remove_item(song_id)
+            for name in os.listdir(self.__files_path):
+                if name.startswith(str(song_id)):
+                    os.remove(os.path.join(self.__files_path, name))
         else:
             raise KeyError('No music with id {}'.format(song_id))
 
@@ -234,5 +241,5 @@ class Temp:
         self.__db['description'] = value
 
     def get_edit_log(self, timestamp: float = 0) -> list[tuple[int, UUID16]]:
-        query = self.__db.get_edit_log(EditLog.time > datetime.datetime.fromtimestamp(timestamp))
+        query = self.__db.get_edit_log(EditLog.time > datetime.datetime.utcfromtimestamp(timestamp))
         return [(item.type, UUID16(item.uuid)) for item in query]

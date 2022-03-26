@@ -84,6 +84,8 @@ class Store:
                 temp.files = MusicFileList()
                 lines = text.split('\n')
                 for line in lines:
+                    cover_mime = None
+                    cover = None
                     if line == '':
                         continue
                     key, value = re.match(r'(.*?):(.*)', line).groups()
@@ -102,8 +104,10 @@ class Store:
                         temp.info.num = int(value)
                     elif key == 'description':
                         temp.info.description = value
+                    elif key == 'cover_mime':
+                        cover_mime = value
                     elif key == 'cover':
-                        temp.info.cover = open(os.path.join(music_path, 'cover/' + value))
+                        cover = open(os.path.join(music_path, 'cover/' + value), 'rb').read()
                     elif key == 'quality':
                         if value == 'normal':
                             quality = AudioFile.NORMAL
@@ -132,6 +136,8 @@ class Store:
                     elif key == 'lyriclang':
                         temp.lyrics = [Lyric(os.path.join(music_path, f'lyrics/{lang.strip()}.azml')) for lang in
                                        value.split(',') if lang]
+
+                    temp.info.cover = (cover_mime, cover)
 
                 self.__musics.append(temp)
 
@@ -175,6 +181,7 @@ class Store:
                         with open(os.path.join(music_path, 'cover/cover'), 'wb') as f:
                             f.write(music.info.cover[1])
                         tmp['cover'] = 'cover'
+                        tmp['cover_mime'] = music.info.cover[0]
                     highest_quality = music.files.highest_quality()
                     for quality in range(AudioFile.NORMAL, highest_quality + 1):
                         if music.files.get_file_from_quality(quality) is None:

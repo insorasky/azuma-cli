@@ -125,3 +125,11 @@ class StoreLaterThanNowException(AzumaException):
     def __repr__(self):
         return f'<StoreVersionIncompatibleException: The store last update time "{self.last_update}" is later than' \
                f'the current system time>'
+
+
+class InvalidTempException(AzumaException):
+    def __init__(self, path):
+        self.path = path
+
+    def __repr__(self):
+        return f'<InvalidTempException: The temp "{self.path}" is invalid>'
