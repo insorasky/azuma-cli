@@ -146,7 +146,7 @@ class Store:
 
     def remove(self, music_id: UUID16):
         for item in self.__edits:
-            if item.type == 0 and item.data == music_id:
+            if item.data.info.id == music_id:
                 self.__edits.remove(item)
         if music_id in self.__musics:
             self.__edits.append(Edit(Edit.REMOVE, music_id))

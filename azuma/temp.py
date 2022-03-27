@@ -41,7 +41,7 @@ class MusicItem(Base):
     file = Column(JSON)  # 歌曲文件路径
     lyric = Column(JSON, nullable=True)  # 歌曲歌词
     description = Column(String, nullable=True)  # 备注
-    time = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)  # 添加时间
+    time = Column(DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now)  # 添加时间
 
 
 class Config(Base):
@@ -49,7 +49,7 @@ class Config(Base):
     id = Column(Integer, primary_key=True)
     name = Column(String(20), index=True)
     value = Column(JSON)
-    time = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)  # 添加时间
+    time = Column(DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now)  # 添加时间
 
 
 class EditLog(Base):
@@ -57,7 +57,7 @@ class EditLog(Base):
     id = Column(Integer, primary_key=True)
     type = Column(Integer)  # 0: add, 1: delete
     uuid = Column(String(16))  # UUID
-    time = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)  # 添加时间
+    time = Column(DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now)  # 添加时间
 
 
 class TempDatabase:
@@ -241,5 +241,5 @@ class Temp:
         self.__db['description'] = value
 
     def get_edit_log(self, timestamp: float = 0) -> list[tuple[int, UUID16]]:
-        query = self.__db.get_edit_log(EditLog.time > datetime.datetime.utcfromtimestamp(timestamp))
+        query = self.__db.get_edit_log(EditLog.time > datetime.datetime.fromtimestamp(timestamp))
         return [(item.type, UUID16(item.uuid)) for item in query]
