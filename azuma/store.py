@@ -223,6 +223,11 @@ class Store:
                     self.__musics.append(music)
                 elif edit.type == Edit.REMOVE:
                     shutil.rmtree(os.path.join(self.__path, 'music/' + str(edit.data)))
+                    for item in new_items:
+                        if 'remove' in item and item['remove'] == str(edit.data):
+                            new_items.remove(item)
+                        if 'id' in item and item['id'] == str(edit.data):
+                            new_items.remove(item)
                     new_items.append({'remove': str(edit.data)})
 
             # Write to meta
