@@ -90,7 +90,7 @@ class Store:
                         continue
                     key, value = re.match(r'(.*?):(.*)', line).groups()
                     if key == 'id':
-                        temp.info.id = value
+                        temp.info.id = UUID16(value)
                         music_path = os.path.join(path, 'music/' + str(temp.info.id))
                     elif key == 'title':
                         temp.info.title = value
@@ -144,10 +144,11 @@ class Store:
     def add(self, music: Music):
         self.__edits.append(Edit(Edit.ADD, music))
 
-    def remove(self, music_id: UUID16):
-        for item in self.__edits:
-            if item.data.info.id == music_id:
-                self.__edits.remove(item)
+
+def remove(self, music_id: UUID16):
+    for item in self.__edits:
+        if item.data.info.id == music_id:
+            self.__edits.remove(item)
         if music_id in self.__musics:
             self.__edits.append(Edit(Edit.REMOVE, music_id))
 
@@ -223,11 +224,6 @@ class Store:
                     self.__musics.append(music)
                 elif edit.type == Edit.REMOVE:
                     shutil.rmtree(os.path.join(self.__path, 'music/' + str(edit.data)))
-                    for item in new_items:
-                        if 'remove' in item and item['remove'] == str(edit.data):
-                            new_items.remove(item)
-                        if 'id' in item and item['id'] == str(edit.data):
-                            new_items.remove(item)
                     new_items.append({'remove': str(edit.data)})
 
             # Write to meta
@@ -245,9 +241,10 @@ class Store:
                     blocks = [block for block in blocks if block.split('\n')[0] not in removed_identities]
                     data = '\n\n'.join(blocks)
                 data += (''.join([
-                            (('\n' if (i or old_music_count) else '') + '\n'.join([f'{key}:{value}' for key, value in info.items()]) + '\n')
-                            for i, info in enumerate(new_items) if 'remove' not in info
-                        ]))
+                    (('\n' if (i or old_music_count) else '') + '\n'.join(
+                        [f'{key}:{value}' for key, value in info.items()]) + '\n')
+                    for i, info in enumerate(new_items) if 'remove' not in info
+                ]))
                 f.write(data.encode('utf-8'))
 
             with lzma.open(os.path.join(self.__path, f'meta/list/{update_time}.xz'), 'w') as f:
@@ -315,6 +312,10 @@ class Store:
             f.write(''.encode('UTF-8'))
         return Store(path)
 
+    @property
+    def music_id_list(self):
+        return [item.info.id for item in self.__musics]
+
 
 def generate_store_from_temp(path: str, temp: Temp):
     if os.path.exists(path):
@@ -331,8 +332,19 @@ def generate_store_from_temp(path: str, temp: Temp):
     store.set_header('name', temp.name)
     store.set_header('maintainer', temp.maintainer)
     store.set_header('description', temp.description)
-    edits_query = temp.get_edit_log(int(store.get_header('last_update')) / 1000)
+    edits_query = temp.get_edit_log(int(store.get_header('last_update')) / 1000)[::-1]
+    edits = []
+    removed = set()
     for edit_type, uuid in edits_query:
+        if uuid in removed:
+            continue
+        if edit_type == 0:
+            edits.append((edit_type, uuid))
+        if edit_type == 1:
+            removed.add(uuid)
+            if uuid in store.music_id_list:
+                edits.append((edit_type, uuid))
+    for edit_type, uuid in edits[::-1]:
         if edit_type == 0:  # Add
             music = temp.get_music(uuid)
             store.add(music)

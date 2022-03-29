@@ -58,3 +58,6 @@ class UUID16:
             return self._u == other._u
         else:
             return False
+
+    def __hash__(self):
+        return hash(self._u)
