@@ -133,3 +133,11 @@ class InvalidTempException(AzumaException):
 
     def __repr__(self):
         return f'<InvalidTempException: The temp "{self.path}" is invalid>'
+
+
+class StoreNotChangedException(AzumaException):
+    def __init__(self, path):
+        self.path = path
+
+    def __repr__(self):
+        return f'<StoreNotChangedException: The store "{self.path}" is not changed>'

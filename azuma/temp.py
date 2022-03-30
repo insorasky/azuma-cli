@@ -90,7 +90,8 @@ class TempDatabase:
 
     def __getitem__(self, item):
         if self.__db_sess.query(exists().where(Config.name == item)).scalar():
-            return self.__db_sess.query(Config).filter(Config.name == item).first().value
+            value = self.__db_sess.query(Config).filter(Config.name == item).first().value
+            return value if value else None
         else:
             return None
 
@@ -218,27 +219,27 @@ class Temp:
 
     @property
     def name(self):
-        return self.__db['name']
+        return self.config('name')
 
     @name.setter
     def name(self, value):
-        self.__db['name'] = value
+        self.config('name', value)
 
     @property
     def maintainer(self):
-        return self.__db['maintainer']
+        return self.config('maintainer')
 
     @maintainer.setter
     def maintainer(self, value):
-        self.__db['maintainer'] = value
+        self.config('maintainer', value)
 
     @property
     def description(self):
-        return self.__db['description']
+        return self.config('description')
 
     @description.setter
     def description(self, value):
-        self.__db['description'] = value
+        self.config('description', value)
 
     def get_edit_log(self, timestamp: float = 0) -> list[tuple[int, UUID16]]:
         query = self.__db.get_edit_log(EditLog.time > datetime.datetime.fromtimestamp(timestamp))

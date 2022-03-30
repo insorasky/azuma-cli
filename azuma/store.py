@@ -20,7 +20,8 @@ from distutils.version import LooseVersion
 from typing import Union
 
 from azuma.exception import InvalidStoreException, FileOrDirectoryExistsException, HeaderProtectedException, \
-    HeaderNotFoundException, StoreIdNotMatchException, StoreVersionIncompatibleException, StoreLaterThanNowException
+    HeaderNotFoundException, StoreIdNotMatchException, StoreVersionIncompatibleException, StoreLaterThanNowException, \
+    StoreNotChangedException
 from azuma.file import AudioFile
 from azuma.music import Music, MusicInfo, MusicFileList
 from azuma.lyric import Lyric
@@ -47,6 +48,7 @@ class Store:
         self.__headers = {}
         self.__musics = []
         self.__edits: list[Edit] = []
+        self.__header_edited: bool = False
         if not os.path.isdir(path):
             raise InvalidStoreException(path)
 
@@ -144,13 +146,12 @@ class Store:
     def add(self, music: Music):
         self.__edits.append(Edit(Edit.ADD, music))
 
-
-def remove(self, music_id: UUID16):
-    for item in self.__edits:
-        if item.data.info.id == music_id:
-            self.__edits.remove(item)
-        if music_id in self.__musics:
-            self.__edits.append(Edit(Edit.REMOVE, music_id))
+    def remove(self, music_id: UUID16):
+        # for item in self.__edits:
+        #     if item.data.info.id == music_id:
+        #         self.__edits.remove(item)
+        #     if music_id in self.__musics:
+        self.__edits.append(Edit(Edit.REMOVE, music_id))
 
     def commit(self):
         # Music
@@ -239,38 +240,45 @@ def remove(self, music_id: UUID16):
                         blocks.pop()
                     removed_identities = ['id:' + str(item.data) for item in self.__edits if item.type == Edit.REMOVE]
                     blocks = [block for block in blocks if block.split('\n')[0] not in removed_identities]
-                    data = '\n\n'.join(blocks)
-                data += (''.join([
-                    (('\n' if (i or old_music_count) else '') + '\n'.join(
-                        [f'{key}:{value}' for key, value in info.items()]) + '\n')
-                    for i, info in enumerate(new_items) if 'remove' not in info
-                ]))
-                f.write(data.encode('utf-8'))
+                    data = '\n\n'.join(blocks).strip()
+                data += ('\n\n' + ('\n\n'.join(['\n'.join([f'{key}:{value}' for key, value in info.items()])
+                                                for info in new_items if 'remove' not in info])))
+                f.write(data.strip().encode('utf-8'))
 
             with lzma.open(os.path.join(self.__path, f'meta/list/{update_time}.xz'), 'w') as f:
-                f.write(
-                    (''.join([
-                        (('\n' if i else '') + '\n'.join([f'{key}:{value}' for key, value in info.items()]) + '\n')
-                        for i, info in enumerate(new_items)
-                    ])).encode('utf-8')
-                )
+                data = '\n\n'.join(['\n'.join([f'{key}:{value}' for key, value in info.items()])
+                                    for info in new_items]).strip()
+                f.write(data.encode('utf-8'))
+
+            self.__headers['last_update'] = str(update_time)
+        else:  # No edits
+            if not self.__header_edited:
+                raise StoreNotChangedException(self.__path)
+            # Write to meta
+            # update_time = int(time.time() * 1000)
+            # self.__headers['list'] += ',' + str(update_time)
+            # with lzma.open(os.path.join(self.__path, f'meta/list/{update_time}.xz'), 'w') as f:
+            #     f.write(b'')
 
         # Headers
-        if update_time is None:
-            update_time = int(time.time() * 1000)
-        self.__headers['last_update'] = str(update_time)
-        header_text = '\n'.join([f'{key}:{value}' for key, value in self.__headers.items()])
+        # if update_time is None:
+        #     update_time = int(time.time() * 1000)
+        header_text = '\n'.join([f'{key}:{value if value else ""}' for key, value in self.__headers.items()])
         with lzma.open(os.path.join(self.__path, 'meta/header.xz'), 'w') as f:
             f.write(header_text.encode('utf-8'))
 
         self.__edits = []
 
     def set_header(self, key: str, value: str):
-        if value is None:
-            value = ''
         if key in HEADERS_PROTECTED:
             raise HeaderProtectedException(key)
-        self.__headers[key] = value
+        try:
+            rewrite = self.get_header(key) != value
+        except HeaderNotFoundException:
+            rewrite = True
+        if rewrite:
+            self.__headers[key] = value
+            self.__header_edited = True
 
     def remove_header(self, key):
         if key in HEADERS_PROTECTED:
@@ -278,11 +286,16 @@ def remove(self, music_id: UUID16):
         if key not in self.__headers:
             raise HeaderNotFoundException(key)
         del self.__headers[key]
+        self.__header_edited = True
 
     def get_header(self, key: str):
         if key not in self.__headers:
             raise HeaderNotFoundException(key)
-        return self.__headers[key]
+        result = self.__headers[key]
+        if result:
+            return result
+        else:
+            return None
 
     @property
     def id(self):
