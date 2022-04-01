@@ -204,9 +204,9 @@ class Temp:
         else:
             raise KeyError('No music with id {}'.format(song_id))
 
-    def all_items(self) -> list[tuple[UUID16, str]]:
+    def all_items(self) -> list[tuple[UUID16, str, str]]:
         query = self.__db.get_item()
-        return [(UUID16(item.song_id), item.title) for item in query]
+        return [(UUID16(item.song_id), item.title, item.artist) for item in query]
 
     def config(self, key, value=None):
         if value is None:
