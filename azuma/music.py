@@ -22,7 +22,7 @@ class MusicInfo:
         """
         self.id: UUID16 = None  # 曲目ID
         self.title: str = None  # 曲名
-        self.artist: str = None  # 艺术家
+        self.artist: list[str] = None  # 艺术家
         self.album: str = None  # 专辑
         self.cover: tuple[str, bytes] = None, None  # 专辑封面(MIME, 封面内容)
         self.type: int = None  # 歌曲类型

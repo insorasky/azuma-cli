@@ -1,6 +1,8 @@
 import os
 import logging
 import argparse
+from mimetypes import guess_type
+
 from azuma import convert, AudioFile, Lyric, Temp, Music, Store, generate_store_from_temp, UUID16, exception, __version__
 
 parser = argparse.ArgumentParser(description='Azuma CLI - audio distribution tool', prog='azuma',
@@ -16,7 +18,8 @@ commands:
 ''')
 
 parser.add_argument('command', metavar='command', type=str, help='command to execute',
-                    choices=['create', 'add', 'detail', 'edit', 'remove', 'list', 'meta', 'commit', 'version']
+                    choices=['create', 'add', 'detail', 'edit', 'remove', 'list', 'configure', 'commit', 'version',
+                             'audio', 'lyric']
                     )
 parser.add_argument('args', metavar='args', type=str, nargs='*', help='arguments for command')
 parser.add_argument('-v', '--verbose', action='store_true', help='verbose output')
@@ -50,11 +53,31 @@ def main(args=None):
             print('UUID Title Artist')
             for uuid, title, artist in temp.all_items():
                 print(str(uuid), title, ','.join(artist))
-        elif args.command == 'meta':
-            pass
+        elif args.command == 'configure':
+            if args.args[0] in ['name', 'maintainer', 'description']:
+                temp.config(args.args[0], args.args[1])
+            else:
+                raise ValueError(f'{args.args[0]} is not a valid configuration key')
         elif args.command == 'commit':
-            pass
+            generate_store_from_temp(args.args[0], temp)
         elif args.command == 'detail':
-            pass
+            print(f'UUID: {temp.id}')
+            print(f'Name: {temp.name}')
+            print(f'Maintainer: {temp.maintainer}')
+            print(f'Description: {temp.description}')
         elif args.command == 'edit':
+            music_id, key, value = args.args
+            music = temp.get_music(UUID16(music_id))
+            if key in ['title', 'album', 'description']:
+                music.info.__dict__[key] = value
+            elif key == 'artist':
+                music.info.artist = value.split(',')
+            elif key == 'cover':
+                with open(value, 'rb') as f:
+                    music.info.cover = guess_type(value)[0], f.read()
+            elif key in ['type', 'num']:
+                music.info.__dict__[key] = int(value)
+            else:
+                raise ValueError(f'{key} is not a valid key')
+        elif args.command == 'lyric':
             pass
