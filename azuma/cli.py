@@ -3,7 +3,8 @@ import logging
 import argparse
 from mimetypes import guess_type
 
-from azuma import convert, AudioFile, Lyric, Temp, Music, Store, generate_store_from_temp, UUID16, exception, __version__
+from azuma import convert, AudioFile, Lyric, Temp, Music, Store, generate_store_from_temp, UUID16, exception, \
+    __version__
 
 parser = argparse.ArgumentParser(description='Azuma CLI - audio distribution tool', prog='azuma',
                                  formatter_class=argparse.RawDescriptionHelpFormatter, epilog='''
@@ -23,6 +24,8 @@ parser.add_argument('command', metavar='command', type=str, help='command to exe
                     )
 parser.add_argument('args', metavar='args', type=str, nargs='*', help='arguments for command')
 parser.add_argument('-v', '--verbose', action='store_true', help='verbose output')
+parser.add_argument('--language', type=str, help='language for lyric')
+parser.add_argument('--original', type=bool, help='original lyric')
 
 
 def main(args=None):
@@ -80,4 +83,29 @@ def main(args=None):
             else:
                 raise ValueError(f'{key} is not a valid key')
         elif args.command == 'lyric':
-            pass
+            subcommand = args.args[0]
+            arg = args.args[1:]
+            music = temp.get_music(UUID16(arg[0]))
+            if subcommand == 'add':
+                if subcommand.endswith('.lrc'):
+                    if args.language:
+                        lyric = Lyric.load_from_lrc(arg[1], args.original, args.language)
+                    else:
+                        raise ValueError('language is required')
+                elif subcommand.endswith('.azml'):
+                    lyric = Lyric(arg[0])
+                else:
+                    raise ValueError(f'Unknown type of lyric file: {arg[0]}')
+                music.lyrics.append(lyric)
+                temp.commit_music(music)
+            elif subcommand == 'remove':
+                lyrics = [lyric for lyric in music.lyrics if lyric.lang == arg[1]]
+                if len(lyrics) == 0:
+                    raise ValueError(f'No lyric found for {arg[1]}')
+                else:
+                    for lyric in lyrics:
+                        music.lyrics.remove(lyric)
+            elif subcommand == 'list':
+                print('Artist', 'Creator', 'Offset', 'Language', 'Original', 'Version')
+                for lyric in music.lyrics:
+                    print(lyric.artist, lyric.creator, lyric.offset, lyric.lang, lyric.orig, lyric.version)
