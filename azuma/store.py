@@ -61,7 +61,7 @@ class Store:
                 for line in [line.decode('utf-8').strip() for line in f.readlines()]:
                     if line == '':  # Empty line
                         continue
-                    key, value = re.match(r'(.*):(.*)', line).groups()
+                    key, value = re.match(r'^(.*?):(.*)$', line).groups()
                     key, value = key.strip(), value.strip()
                     if value == '':
                         value = None
@@ -90,7 +90,7 @@ class Store:
                     cover = None
                     if line == '':
                         continue
-                    key, value = re.match(r'(.*?):(.*)', line).groups()
+                    key, value = re.match(r'^(.*?):(.*)$', line).groups()
                     if key == 'id':
                         temp.info.id = UUID16(value)
                         music_path = os.path.join(path, 'music/' + str(temp.info.id))
