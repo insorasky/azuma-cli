@@ -2,7 +2,7 @@
 # Copyright (C) 2022  Sora
 # ALL RIGHTS RESERVED.
 #
-# The module is a part of Azuma Store Manager Module.
+# The module is a part of Azuma Repository Manager Module.
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published by
 # the Free Software Foundation; either version 3 of the License, or

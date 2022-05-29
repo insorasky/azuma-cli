@@ -4,13 +4,13 @@ Azuma is an open source project that helps distributing music for music producer
 
 The name is derived from a girl named *Azuma（東）* from the MV of Neru's song [How to world domination](https://www.youtube.com/watch?v=HdC2cB_DZok) *（ハウトゥー世界征服，How to Sekai Seifuku）*.
 
-Azuma is designed to help music producers publish their music more easily without restrictions from music giants, and help music lovers enjoy music more smoothly.
+Azuma is designed to help music producers publish their music more easily without restrictions from online giants, and help music lovers enjoy music more smoothly.
 
 ## Features
 
 - Experiences similar to popular online music platforms
 - Easy to use
-- Add and use any music stores
+- Add and use any music repository
 - Choose any two lyric languages to show
 - Free and open-source
 
@@ -19,10 +19,10 @@ Azuma is designed to help music producers publish their music more easily withou
 ### Music producers
 
 - Install Azuma-CLI or any other Azuma distribution tools
-- Create new Azuma temporarily store
-- Add music to the temporarily store
-- Commit your changes to create a static store
-- Upload all files in the static store folder to any static file hosting service
+- Create new Azuma store
+- Add music to the store
+- Commit your changes to create a static repository
+- Upload all files in the static repository folder to any static file hosting service
 
 ### Music lovers
 
@@ -33,7 +33,7 @@ Azuma is designed to help music producers publish their music more easily withou
 
 ## Contribution
 
-** All kinds of contribution are welcomed. **
+**All kinds of contribution are welcomed.**
 
 If you hold an interest in contributing to Azuma, please feel free to fork and submit a pull request.
 

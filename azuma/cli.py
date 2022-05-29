@@ -2,7 +2,7 @@
 # Copyright (C) 2022  Sora
 # ALL RIGHTS RESERVED.
 #
-# The module is a part of Azuma Store Manager Module.
+# The module is a part of Azuma Repository Manager Module.
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published by
 # the Free Software Foundation; either version 3 of the License, or
@@ -13,18 +13,18 @@ import logging
 import argparse
 from mimetypes import guess_type
 
-from azuma import convert, AudioFile, Lyric, Temp, Music, Store, generate_store_from_temp, UUID16, exception, \
+from azuma import convert, AudioFile, Lyric, Store, Music, Repository, generate_repository_from_store, UUID16, exception, \
     __version__
 
 parser = argparse.ArgumentParser(description='Azuma CLI - audio distribution tool', prog='azuma',
                                  formatter_class=argparse.RawDescriptionHelpFormatter, epilog='''
 commands:
-  create         create a new temporary
-  add            add audio to temporary
-  remove         remove audio from temporary
-  list           list audio in temporary
-  meta           show meta data of temporary
-  commit         commit temporary to store
+  create         create a new store
+  add            add audio to store
+  remove         remove audio from store
+  list           list audio in store
+  meta           show meta data of store
+  commit         commit store to repository
   version        show version
 ''')
 
@@ -33,7 +33,7 @@ parser.add_argument('command', metavar='command', type=str, help='command to exe
                              'audio', 'lyric']
                     )
 parser.add_argument('args', metavar='args', type=str, nargs='*', help='arguments for command')
-parser.add_argument('-v', '--verbose', action='store_true', help='verbose output')
+parser.add_argument('-v', '--verbose', action='repository_true', help='verbose output')
 parser.add_argument('--language', type=str, help='language for lyric')
 parser.add_argument('--original', type=bool, help='original lyric')
 
@@ -53,34 +53,34 @@ def main(args=None):
     elif args.command == 'create':
         if os.path.exists(args.args[0]):
             raise FileExistsError(f'{args.args[0]} already exists')
-        temp = Temp(args.args[0])
+        store = Store(args.args[0])
     else:
-        temp = Temp(os.getcwd())
+        store = Store(os.getcwd())
         if args.command == 'add':
             music = Music(args.args[0])
-            temp.commit_music(music)
+            store.commit_music(music)
             print(music.info.id)
         elif args.command == 'remove':
-            temp.delete_music(UUID16(args.args[0]))
+            store.delete_music(UUID16(args.args[0]))
         elif args.command == 'list':
             print('UUID Title Artist')
-            for uuid, title, artist in temp.all_items():
+            for uuid, title, artist in store.all_items():
                 print(str(uuid), title, ','.join(artist))
         elif args.command == 'configure':
             if args.args[0] in ['name', 'maintainer', 'description']:
-                temp.config(args.args[0], args.args[1])
+                store.config(args.args[0], args.args[1])
             else:
                 raise ValueError(f'{args.args[0]} is not a valid configuration key')
         elif args.command == 'commit':
-            generate_store_from_temp(args.args[0], temp)
+            generate_repository_from_store(args.args[0], store)
         elif args.command == 'detail':
-            print(f'UUID: {temp.id}')
-            print(f'Name: {temp.name}')
-            print(f'Maintainer: {temp.maintainer}')
-            print(f'Description: {temp.description}')
+            print(f'UUID: {store.id}')
+            print(f'Name: {store.name}')
+            print(f'Maintainer: {store.maintainer}')
+            print(f'Description: {store.description}')
         elif args.command == 'edit':
             music_id, key, value = args.args
-            music = temp.get_music(UUID16(music_id))
+            music = store.get_music(UUID16(music_id))
             if key in ['title', 'album', 'description']:
                 music.info.__dict__[key] = value
             elif key == 'artist':
@@ -95,7 +95,7 @@ def main(args=None):
         elif args.command == 'lyric':
             subcommand = args.args[0]
             arg = args.args[1:]
-            music = temp.get_music(UUID16(arg[0]))
+            music = store.get_music(UUID16(arg[0]))
             if subcommand == 'add':
                 if subcommand.endswith('.lrc'):
                     if args.language:
@@ -107,7 +107,7 @@ def main(args=None):
                 else:
                     raise ValueError(f'Unknown type of lyric file: {arg[0]}')
                 music.lyrics.append(lyric)
-                temp.commit_music(music)
+                store.commit_music(music)
             elif subcommand == 'remove':
                 lyrics = [lyric for lyric in music.lyrics if lyric.lang == arg[1]]
                 if len(lyrics) == 0:

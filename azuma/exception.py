@@ -2,7 +2,7 @@
 # Copyright (C) 2022  Sora
 # ALL RIGHTS RESERVED.
 #
-# The module is a part of Azuma Store Manager Module.
+# The module is a part of Azuma Repository Manager Module.
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published by
 # the Free Software Foundation; either version 3 of the License, or
@@ -51,12 +51,12 @@ class InvalidLRCLineException(AzumaException):
         return f'<InvalidLRCLine: Invalid line "{self.line}" in LRC file "{self.file}">'
 
 
-class InvalidStoreException(AzumaException):
+class InvalidRepositoryException(AzumaException):
     def __init__(self, path):
         self.path = path
 
     def __repr__(self):
-        return f'<InvalidStoreException: Invalid store "{self.path}">'
+        return f'<InvalidRepositoryException: Invalid repository "{self.path}">'
 
 
 class FileOrDirectoryExistsException(AzumaException):
@@ -100,44 +100,44 @@ class HeaderNotFoundException(AzumaException):
         return f'<HeaderNotFoundException: The header "{self.key}" is not found>'
 
 
-class StoreIdNotMatchException(AzumaException):
-    def __init__(self, store_id, temp_id):
+class RepositoryIdNotMatchException(AzumaException):
+    def __init__(self, repository_id, store_id):
+        self.repository_id = repository_id
         self.store_id = store_id
-        self.temp_id = temp_id
 
     def __repr__(self):
-        return f'<StoreIdNotMatchException: The store id "{self.store_id}" does not match the temp id "{self.temp_id}">'
+        return f'<RepositoryIdNotMatchException: The repository id "{self.repository_id}" does not match the store id "{self.store_id}">'
 
 
-class StoreVersionIncompatibleException(AzumaException):
-    def __init__(self, store_version):
-        self.store_version = store_version
+class RepositoryVersionIncompatibleException(AzumaException):
+    def __init__(self, repository_version):
+        self.repository_version = repository_version
 
     def __repr__(self):
-        return f'<StoreVersionIncompatibleException: The store version "{self.store_version}" is newer than' \
+        return f'<RepositoryVersionIncompatibleException: The repository version "{self.repository_version}" is newer than' \
                f'the current azuma-cli version "{STORE_VERSION}">'
 
 
-class StoreLaterThanNowException(AzumaException):
+class RepositoryLaterThanNowException(AzumaException):
     def __init__(self, last_update):
         self.last_update = last_update
 
     def __repr__(self):
-        return f'<StoreVersionIncompatibleException: The store last update time "{self.last_update}" is later than' \
+        return f'<RepositoryVersionIncompatibleException: The repository last update time "{self.last_update}" is later than' \
                f'the current system time>'
 
 
-class InvalidTempException(AzumaException):
+class InvalidStoreException(AzumaException):
     def __init__(self, path):
         self.path = path
 
     def __repr__(self):
-        return f'<InvalidTempException: The temp "{self.path}" is invalid>'
+        return f'<InvalidStoreException: The store "{self.path}" is invalid>'
 
 
-class StoreNotChangedException(AzumaException):
+class RepositoryNotChangedException(AzumaException):
     def __init__(self, path):
         self.path = path
 
     def __repr__(self):
-        return f'<StoreNotChangedException: The store "{self.path}" is not changed>'
+        return f'<RepositoryNotChangedException: The repository "{self.path}" is not changed>'

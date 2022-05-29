@@ -120,7 +120,7 @@ dmypy.json
 music_example/
 public/
 test/
-temp*/
+repo*/
 store*/
 
 # macOS

@@ -2,7 +2,7 @@
 # Copyright (C) 2022  Sora
 # ALL RIGHTS RESERVED.
 #
-# The module is a part of Azuma Store Manager Module.
+# The module is a part of Azuma Repository Manager Module.
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published by
 # the Free Software Foundation; either version 3 of the License, or
@@ -49,8 +49,9 @@ class MusicInfo:
                 tmp.album = m['TALB'].text[0]
             except (KeyError, IndexError):
                 pass
+            apic_name = [n for n in list(m) if n.startswith('APIC:')][0]
             try:
-                tmp.cover = m['APIC:'].mime, m['APIC:'].data
+                tmp.cover = m[apic_name].mime, m[apic_name].data
             except (KeyError, IndexError):
                 pass
             try:

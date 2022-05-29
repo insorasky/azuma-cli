@@ -2,366 +2,245 @@
 # Copyright (C) 2022  Sora
 # ALL RIGHTS RESERVED.
 #
-# The module is a part of Azuma Store Manager Module.
+# The module is a part of Azuma Repository Manager Module.
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published by
 # the Free Software Foundation; either version 3 of the License, or
 # (at your option) any later version.
 
-import os
-import lzma
-import re
-import shutil
-import time
-import logging
-import hashlib
-import json
-from distutils.version import LooseVersion
-from typing import Union
 
-from azuma.exception import InvalidStoreException, FileOrDirectoryExistsException, HeaderProtectedException, \
-    HeaderNotFoundException, StoreIdNotMatchException, StoreVersionIncompatibleException, StoreLaterThanNowException, \
-    StoreNotChangedException
-from azuma.file import AudioFile
-from azuma.music import Music, MusicInfo, MusicFileList
+from sqlalchemy import Column, String, Integer, LargeBinary, JSON, create_engine, DateTime
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.sql import exists
+
+from azuma.exception import InvalidStoreException
 from azuma.lyric import Lyric
-from azuma.temp import Temp
+from azuma.music import Music
 from azuma.uuid import UUID16
-from azuma.audio import convert
-from azuma.utils import STORE_VERSION
 
-HEADERS_PROTECTED = ['id', 'version']
+import datetime
+import os
+import copy
+import shutil
+
+Base = declarative_base()
 
 
-class Edit:
-    ADD = 0
-    REMOVE = 1
+class MusicItem(Base):
+    __tablename__ = 'music_item'
+    id = Column(Integer, primary_key=True)  # Database field ID
+    song_id = Column(String(16))  # Song ID
+    title = Column(String)  # Name of song
+    artist = Column(JSON, nullable=True)  # 艺术家
+    album = Column(String, nullable=True)  # 专辑
+    cover_mime = Column(String, nullable=True)  # 专辑封面MIME
+    cover_content = Column(LargeBinary, nullable=True)  # 专辑封面内容
+    type = Column(String, nullable=True)  # 歌曲类型
+    num = Column(Integer, nullable=True)  # 歌曲专辑内位置
+    file = Column(JSON)  # 歌曲文件路径
+    lyric = Column(JSON, nullable=True)  # 歌曲歌词
+    description = Column(String, nullable=True)  # 备注
+    time = Column(DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now)  # 添加时间
 
-    def __init__(self, type_: int, data: Union[Music, UUID16]):
-        self.type = type_
-        self.data = data
+
+class Config(Base):
+    __tablename__ = 'config'
+    id = Column(Integer, primary_key=True)
+    name = Column(String(20), index=True)
+    value = Column(JSON)
+    time = Column(DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now)  # 添加时间
+
+
+class EditLog(Base):
+    __tablename__ = 'editlog'
+    id = Column(Integer, primary_key=True)
+    type = Column(Integer)  # 0: add, 1: delete
+    uuid = Column(String(16))  # UUID
+    time = Column(DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now)  # 添加时间
+
+
+class StoreDatabase:
+    def __init__(self, path: str):
+        self.__path = os.path.abspath(path)
+        if os.path.exists(self.__path):
+            self.__engine = create_engine('sqlite:///' + self.__path, echo=False)
+        else:
+            self.__engine = create_engine('sqlite:///' + self.__path, echo=False)
+            Base.metadata.create_all(self.__engine)
+        session = sessionmaker(bind=self.__engine)
+        self.__db_sess = session()
+
+    def new_item(self, item: MusicItem, auto_commit: bool = True):
+        self.__db_sess.add(item)
+        self.__db_sess.add(EditLog(type=0, uuid=str(item.song_id)))
+        if auto_commit:
+            self.__db_sess.commit()
+
+    def get_item(self, *args):
+        return self.__db_sess.query(MusicItem).filter(*args).all()
+
+    def remove_item(self, song_id: UUID16):
+        self.__db_sess.query(MusicItem).filter(MusicItem.song_id == str(song_id)).delete()
+        self.__db_sess.add(EditLog(type=1, uuid=str(song_id)))
+        self.__db_sess.commit()
+
+    def get_edit_log(self, *args):
+        return self.__db_sess.query(EditLog).filter(*args).all()
+
+    def __getitem__(self, item):
+        if self.__db_sess.query(exists().where(Config.name == item)).scalar():
+            value = self.__db_sess.query(Config).filter(Config.name == item).first().value
+            return value if value else None
+        else:
+            return None
+
+    def __setitem__(self, key, value):
+        if self.__db_sess.query(exists().where(Config.name == key)).scalar():
+            self.__db_sess.query(Config).filter(Config.name == key).first().value = value
+        else:
+            self.__db_sess.add(Config(name=key, value=value))
+        self.__db_sess.commit()
+
+    def __delitem__(self, key):
+        self.__db_sess.query(Config).filter(Config.name == key).delete()
+        self.__db_sess.commit()
 
 
 class Store:
     def __init__(self, path: str):
         self.__path = os.path.abspath(path)
-        self.__headers = {}
-        self.__musics = []
-        self.__edits: list[Edit] = []
-        self.__header_edited: bool = False
-        if not os.path.isdir(path):
-            raise InvalidStoreException(path)
-
-        # Initialize headers
-        header_path = os.path.join(path, 'meta/header.xz')
-        if not os.path.exists(header_path):
-            raise InvalidStoreException(path)
-        try:
-            with lzma.open(header_path) as f:
-                for line in [line.decode('utf-8').strip() for line in f.readlines()]:
-                    if line == '':  # Empty line
-                        continue
-                    key, value = re.match(r'^(.*?):(.*)$', line).groups()
-                    key, value = key.strip(), value.strip()
-                    if value == '':
-                        value = None
-                    self.__headers[key] = value
-        except (lzma.LZMAError, FileNotFoundError):
-            raise InvalidStoreException(path)
-
-        # Initialize store
-        store_text_path = os.path.join(path, 'meta/list/all.xz')
-        if not os.path.exists(store_text_path):
-            raise InvalidStoreException(path)
-        try:
-            with lzma.open(store_text_path) as f:
-                store_text = f.read().decode('utf-8')
-        except (lzma.LZMAError, FileNotFoundError):
-            raise InvalidStoreException(path)
-        if store_text:
-            song_texts = store_text.split('\n\n')
-            for text in song_texts:
-                temp = Music()
-                temp.info = MusicInfo()
-                temp.files = MusicFileList()
-                lines = text.split('\n')
-                for line in lines:
-                    cover_mime = None
-                    cover = None
-                    if line == '':
-                        continue
-                    key, value = re.match(r'^(.*?):(.*)$', line).groups()
-                    if key == 'id':
-                        temp.info.id = UUID16(value)
-                        music_path = os.path.join(path, 'music/' + str(temp.info.id))
-                    elif key == 'title':
-                        temp.info.title = value
-                    elif key == 'artist':
-                        temp.info.artist = json.loads(value)
-                    elif key == 'album':
-                        temp.info.album = value
-                    elif key == 'type':
-                        temp.info.type = int(value)
-                    elif key == 'num':
-                        temp.info.num = int(value)
-                    elif key == 'description':
-                        temp.info.description = value
-                    elif key == 'cover_mime':
-                        cover_mime = value
-                    elif key == 'cover':
-                        cover = open(os.path.join(music_path, 'cover/' + value), 'rb').read()
-                    elif key == 'quality':
-                        if value == 'normal':
-                            quality = AudioFile.NORMAL
-                        elif value == 'better':
-                            quality = AudioFile.BETTER
-                        elif value == 'high':
-                            quality = AudioFile.HIGH
-                        elif value == 'best':
-                            quality = AudioFile.BEST
-                        elif value == 'original':
-                            quality = AudioFile.ORIGINAL
-                        else:
-                            raise InvalidStoreException(path)
-
-                        if quality >= AudioFile.NORMAL:
-                            temp.files.normal = AudioFile(os.path.join(music_path, 'files/normal.mp3'))
-                        if quality >= AudioFile.BETTER:
-                            temp.files.better = AudioFile(os.path.join(music_path, 'files/better.mp3'))
-                        if quality >= AudioFile.HIGH:
-                            temp.files.high = AudioFile(os.path.join(music_path, 'files/high.mp3'))
-                        if quality >= AudioFile.BEST:
-                            temp.files.best = AudioFile(os.path.join(music_path, 'files/best.mp3'))
-                        if quality >= AudioFile.ORIGINAL:
-                            temp.files.original = AudioFile(os.path.join(music_path, 'files/original.flac'))
-
-                    elif key == 'lyriclang':
-                        temp.lyrics = [Lyric(os.path.join(music_path, f'lyrics/{lang.strip()}.azml')) for lang in
-                                       value.split(',') if lang]
-
-                    temp.info.cover = (cover_mime, cover)
-
-                self.__musics.append(temp)
-
-    def add(self, music: Music):
-        self.__edits.append(Edit(Edit.ADD, music))
-
-    def remove(self, music_id: UUID16):
-        # for item in self.__edits:
-        #     if item.data.info.id == music_id:
-        #         self.__edits.remove(item)
-        #     if music_id in self.__musics:
-        self.__edits.append(Edit(Edit.REMOVE, music_id))
-
-    def commit(self):
-        # Music
-        update_time = None
-        if len(self.__edits):
-            new_items = []
-            old_music_count = len(self.__musics)
-            for edit in self.__edits:
-                if edit.type == Edit.ADD:
-                    music = edit.data
-                    logging.debug(f'Processing Music {music.info.title}: {music.info.id}')
-                    music_path = os.path.join(self.__path, 'music/' + str(music.info.id))
-                    os.mkdir(music_path)
-                    os.mkdir(os.path.join(music_path, 'cover'))
-                    os.mkdir(os.path.join(music_path, 'files'))
-                    os.mkdir(os.path.join(music_path, 'lyrics'))
-                    tmp = {'id': music.info.id, 'title': music.info.title}
-                    if music.info.artist:
-                        tmp['artist'] = json.dumps(music.info.artist)
-                    if music.info.album:
-                        tmp['album'] = music.info.album
-                    if music.info.type is not None:
-                        tmp['type'] = str(music.info.type)
-                    if music.info.num is not None:
-                        tmp['num'] = str(music.info.num)
-                    if music.info.description:
-                        tmp['description'] = music.info.description
-                    if music.info.cover[1]:
-                        with open(os.path.join(music_path, 'cover/cover'), 'wb') as f:
-                            f.write(music.info.cover[1])
-                        tmp['cover'] = 'cover'
-                        tmp['cover_mime'] = music.info.cover[0]
-                    highest_quality = music.files.highest_quality()
-                    for quality in range(AudioFile.NORMAL, highest_quality + 1):
-                        if music.files.get_file_from_quality(quality) is None:
-                            if quality < highest_quality:
-                                output_path = os.path.join(music_path,
-                                                           f'files/{AudioFile.get_quality_str(quality)}.mp3')
-                                convert(
-                                    input_file=music.files.get_file_from_quality(highest_quality),
-                                    output_path=output_path,
-                                    quality=quality
-                                )
-                                file = open(output_path, 'rb')
-                                md5 = hashlib.md5(file.read()).hexdigest()
-                                file.close()
-                                with open(output_path + '.md5', 'w') as f:
-                                    f.write(md5)
-                        else:
-                            output_path = os.path.join(music_path,
-                                                       f'files/{AudioFile.get_quality_str(quality)}{os.path.splitext(music.files.get_file_from_quality(quality).path)[1]}')
-                            shutil.copyfile(
-                                music.files.get_file_from_quality(quality).path,
-                                output_path
-                            )
-                            file = open(output_path, 'rb')
-                            md5 = hashlib.md5(file.read()).hexdigest()
-                            file.close()
-                            with open(output_path + '.md5', 'w') as f:
-                                f.write(md5)
-                    tmp['quality'] = AudioFile.get_quality_str(highest_quality)
-
-                    # Lyrics
-                    languages = []
-                    for lyric in music.lyrics:
-                        lyric.export(os.path.join(music_path, f'lyrics/{lyric.lang}.azml'))
-                        languages.append(lyric.lang)
-                    tmp['lyriclang'] = ','.join(languages)
-                    new_items.append(tmp)
-
-                    self.__musics.append(music)
-                elif edit.type == Edit.REMOVE:
-                    shutil.rmtree(os.path.join(self.__path, 'music/' + str(edit.data)))
-                    new_items.append({'remove': str(edit.data)})
-
-            # Write to meta
-            update_time = int(time.time() * 1000)
-            self.__headers['list'] += ',' + str(update_time)
-
-            with lzma.open(os.path.join(self.__path, 'meta/list/all.xz'), 'r') as f:
-                data = f.read().decode('utf-8')
-            with lzma.open(os.path.join(self.__path, 'meta/list/all.xz'), 'w') as f:
-                if data:
-                    blocks = data.split('\n\n')
-                    if blocks[-1] == '':
-                        blocks.pop()
-                    removed_identities = ['id:' + str(item.data) for item in self.__edits if item.type == Edit.REMOVE]
-                    blocks = [block for block in blocks if block.split('\n')[0] not in removed_identities]
-                    data = '\n\n'.join(blocks).strip()
-                data += ('\n\n' + ('\n\n'.join(['\n'.join([f'{key}:{value}' for key, value in info.items()])
-                                                for info in new_items if 'remove' not in info])))
-                f.write(data.strip().encode('utf-8'))
-
-            with lzma.open(os.path.join(self.__path, f'meta/list/{update_time}.xz'), 'w') as f:
-                data = '\n\n'.join(['\n'.join([f'{key}:{value}' for key, value in info.items()])
-                                    for info in new_items]).strip()
-                f.write(data.encode('utf-8'))
-
-            self.__headers['last_update'] = str(update_time)
-        else:  # No edits
-            if not self.__header_edited:
-                raise StoreNotChangedException(self.__path)
-            # Write to meta
-            # update_time = int(time.time() * 1000)
-            # self.__headers['list'] += ',' + str(update_time)
-            # with lzma.open(os.path.join(self.__path, f'meta/list/{update_time}.xz'), 'w') as f:
-            #     f.write(b'')
-
-        # Headers
-        # if update_time is None:
-        #     update_time = int(time.time() * 1000)
-        header_text = '\n'.join([f'{key}:{value if value else ""}' for key, value in self.__headers.items()])
-        with lzma.open(os.path.join(self.__path, 'meta/header.xz'), 'w') as f:
-            f.write(header_text.encode('utf-8'))
-
-        self.__edits = []
-
-    def set_header(self, key: str, value: str):
-        if key in HEADERS_PROTECTED:
-            raise HeaderProtectedException(key)
-        try:
-            rewrite = self.get_header(key) != value
-        except HeaderNotFoundException:
-            rewrite = True
-        if rewrite:
-            self.__headers[key] = value
-            self.__header_edited = True
-
-    def remove_header(self, key):
-        if key in HEADERS_PROTECTED:
-            raise HeaderProtectedException(key)
-        if key not in self.__headers:
-            raise HeaderNotFoundException(key)
-        del self.__headers[key]
-        self.__header_edited = True
-
-    def get_header(self, key: str):
-        if key not in self.__headers:
-            raise HeaderNotFoundException(key)
-        result = self.__headers[key]
-        if result:
-            return result
+        if os.path.exists(self.__path):
+            if not os.path.exists(os.path.join(self.__path, 'store.db')):
+                raise InvalidStoreException(self.__path)
         else:
-            return None
+            os.mkdir(self.__path)
+        self.__db = StoreDatabase(os.path.join(self.__path, 'store.db'))
+        self.__files_path = os.path.join(self.__path, 'files/')
+        if not os.path.exists(self.__files_path):
+            os.mkdir(self.__files_path)
+
+        # ID
+        if self.__db['id'] is None:
+            self.__id = UUID16()
+            self.__db['id'] = str(self.__id)
+        else:
+            self.__id = UUID16(self.__db['id'])
+
+        # Create Time
+        if self.__db['create_time'] is None:
+            self.__create_time = datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
+            self.__db['create_time'] = self.__create_time
+        else:
+            self.__create_time = self.__db['create_time']
 
     @property
     def id(self):
-        # Get store ID
-        return UUID16(self.__headers['id'])
+        return self.__id
+
+    def commit_music(self, music: Music):
+        store_music = copy.deepcopy(music)
+
+        # Generate ID when no ID
+        if music.info.id is None:
+            store_music.info.id = UUID16()
+
+        # Copy all music files to store folder
+        for quality, path in music.files.to_dict().items():
+            if path:
+                new_path = os.path.join(self.__files_path,
+                                        str(store_music.info.id) + '_' + quality + os.path.splitext(path)[-1])
+                if path != new_path:
+                    shutil.copyfile(path, new_path)
+                    store_music.files.__dict__[quality].__path = new_path
+
+        # Delete if exists
+        query = self.__db.get_item(MusicItem.song_id == str(store_music.info.id))
+        if query:
+            self.__db.remove_item(store_music.info.id)
+
+        # Add to database
+        self.__db.new_item(MusicItem(
+            song_id=str(store_music.info.id),
+            title=store_music.info.title,
+            artist=store_music.info.artist,
+            album=store_music.info.album,
+            cover_mime=store_music.info.cover[0],
+            cover_content=store_music.info.cover[1],
+            type=store_music.info.type,
+            num=store_music.info.num,
+            file=store_music.files.to_dict(),
+            lyric=[lyric.to_dict() for lyric in store_music.lyrics],
+            description=store_music.info.description
+        ))
+
+        return store_music
+
+    def get_music(self, song_id) -> Music:
+        tmp = Music()
+        query = self.__db.get_item(MusicItem.song_id == str(song_id))
+        if query:
+            tmp.info.id = UUID16(query[0].song_id)
+            tmp.info.title = query[0].title
+            tmp.info.artist = query[0].artist
+            tmp.info.album = query[0].album
+            tmp.info.cover = (query[0].cover_mime, query[0].cover_content)
+            tmp.info.type = query[0].type
+            tmp.info.num = query[0].num
+            tmp.info.description = query[0].description
+            tmp.files.from_dict(query[0].file)
+            tmp.lyrics = [Lyric.from_dict(lyric) for lyric in query[0].lyric]
+            return tmp
+        else:
+            raise KeyError('No music with id {}'.format(song_id))
+
+    def delete_music(self, song_id):
+        query = self.__db.get_item(MusicItem.song_id == str(song_id))
+        if query:
+            self.__db.remove_item(song_id)
+            for name in os.listdir(self.__files_path):
+                if name.startswith(str(song_id)):
+                    os.remove(os.path.join(self.__files_path, name))
+        else:
+            raise KeyError('No music with id {}'.format(song_id))
+
+    def all_items(self) -> list[tuple[UUID16, str, str]]:
+        query = self.__db.get_item()
+        return [(UUID16(item.song_id), item.title, item.artist) for item in query]
+
+    def config(self, key, value=None):
+        if value is None:
+            return self.__db[key]
+        else:
+            self.__db[key] = value
+
+    def unset(self, key):
+        del self.__db[key]
 
     @property
-    def path(self):
-        return self.__path
+    def name(self):
+        return self.config('name')
 
-    @staticmethod
-    def create(path, store_id: UUID16):
-        path = os.path.abspath(path)
-        if os.path.exists(path):
-            raise FileOrDirectoryExistsException(path)
-        # Create Empty Store
-        os.mkdir(path)
-        os.mkdir(os.path.join(path, 'meta'))
-        os.mkdir(os.path.join(path, 'meta/list'))
-        os.mkdir(os.path.join(path, 'music'))
-        with lzma.open(os.path.join(path, 'meta/header.xz'), 'wb') as f:
-            f.write(f'id:{str(store_id)}\n'
-                    f'last_update:0\n'
-                    f'version:{STORE_VERSION}\n'
-                    f'list:all\n'.encode('UTF-8'))
-        with lzma.open(os.path.join(path, 'meta/list/all.xz'), 'wb') as f:
-            f.write(''.encode('UTF-8'))
-        return Store(path)
+    @name.setter
+    def name(self, value):
+        self.config('name', value)
 
     @property
-    def music_id_list(self):
-        return [item.info.id for item in self.__musics]
+    def maintainer(self):
+        return self.config('maintainer')
 
+    @maintainer.setter
+    def maintainer(self, value):
+        self.config('maintainer', value)
 
-def generate_store_from_temp(path: str, temp: Temp):
-    if os.path.exists(path):
-        store = Store(path)
-        if store.id != temp.id:
-            raise StoreIdNotMatchException(store.id, temp.id)
-        version = store.get_header('version')
-        if LooseVersion(version) > LooseVersion(STORE_VERSION):
-            raise StoreVersionIncompatibleException(version)
-        if int(store.get_header('last_update')) > int(time.time() * 1000):
-            raise StoreLaterThanNowException(store.get_header('last_update'))
-    else:
-        store = Store.create(path, temp.id)
-    store.set_header('name', temp.name)
-    store.set_header('maintainer', temp.maintainer)
-    store.set_header('description', temp.description)
-    edits_query = temp.get_edit_log(int(store.get_header('last_update')) / 1000)[::-1]
-    edits = []
-    removed = set()
-    for edit_type, uuid in edits_query:
-        if uuid in removed:
-            continue
-        if edit_type == 0:
-            edits.append((edit_type, uuid))
-        if edit_type == 1:
-            removed.add(uuid)
-            if uuid in store.music_id_list:
-                edits.append((edit_type, uuid))
-    for edit_type, uuid in edits[::-1]:
-        if edit_type == 0:  # Add
-            music = temp.get_music(uuid)
-            store.add(music)
-        elif edit_type == 1:  # Delete
-            store.remove(uuid)
-    store.commit()
-    return store
+    @property
+    def description(self):
+        return self.config('description')
+
+    @description.setter
+    def description(self, value):
+        self.config('description', value)
+
+    def get_edit_log(self, timestamp: float = 0) -> list[tuple[int, UUID16]]:
+        query = self.__db.get_edit_log(EditLog.time > datetime.datetime.fromtimestamp(timestamp))
+        return [(item.type, UUID16(item.uuid)) for item in query]

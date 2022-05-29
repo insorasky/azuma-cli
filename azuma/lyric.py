@@ -2,7 +2,7 @@
 # Copyright (C) 2022  Sora
 # ALL RIGHTS RESERVED.
 #
-# The module is a part of Azuma Store Manager Module.
+# The module is a part of Azuma Repository Manager Module.
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published by
 # the Free Software Foundation; either version 3 of the License, or
@@ -83,6 +83,8 @@ class Lyric:
         tmp.version = 1
         with open(path, 'r') as f:
             for line in [line.strip() for line in f.readlines()]:
+                if line.strip() == '':
+                    continue
                 data = re.match(r'\[(\d*:\d*\.\d*)](.*)', line)  # Lyric text
                 if data is None:
                     if line[-1] == ']':  # ID tag
